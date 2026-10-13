@@ -1,0 +1,6 @@
+Model,Accuracy,Weighted F1,Macro F1,Precision,Recall,Training Time (s)
+Logistic Regression,0.6617,0.6518,0.5507,0.6561,0.6617,24.57
+Linear SVM Calibrated,0.6595,0.6489,0.549,0.6532,0.6595,28.47
+SGD Classifier,0.6602,0.6473,0.536,0.6549,0.6602,2.6
+Multinomial Naive Bayes,0.6519,0.6416,0.5333,0.6468,0.6519,0.04
+Deep Neural MLP,0.6066,0.5955,0.5657,0.6144,0.6144,178.8

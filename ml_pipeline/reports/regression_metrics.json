@@ -1,0 +1,19 @@
+{
+  "target": "pendency_days",
+  "description": "Filing to Grant publication duration in days",
+  "models_evaluated": {
+    "Ridge_Regression": {
+      "val_mae_days": 339.1,
+      "val_mae_months": 11.15,
+      "val_rmse": 431.0,
+      "val_r2": 0.795,
+      "training_time_seconds": 1.22
+    }
+  },
+  "test_evaluation": {
+    "test_mae_days": 343.01,
+    "test_mae_months": 11.28,
+    "test_rmse_days": 436.42,
+    "test_r2": 0.7886
+  }
+}

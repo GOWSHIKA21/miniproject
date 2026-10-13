@@ -1,0 +1,42 @@
+{
+  "model_architecture": "PatentMLPClassifier (BatchNorm + ReLU + Dropout)",
+  "input_dim": 15000,
+  "hidden_dim": 256,
+  "epochs": 8,
+  "best_val_accuracy": 0.6066,
+  "test_accuracy": 0.6144,
+  "test_f1_score": 0.5955,
+  "training_time_seconds": 178.8,
+  "history": {
+    "train_loss": [
+      1.4456,
+      0.8118,
+      0.4804,
+      0.2522,
+      0.1599,
+      0.1083,
+      0.0882,
+      0.0706
+    ],
+    "val_accuracy": [
+      0.6066,
+      0.603,
+      0.5924,
+      0.5944,
+      0.5878,
+      0.583,
+      0.5876,
+      0.5882
+    ],
+    "val_f1": [
+      0.5879,
+      0.5974,
+      0.587,
+      0.5881,
+      0.5829,
+      0.5778,
+      0.5823,
+      0.5837
+    ]
+  }
+}

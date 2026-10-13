@@ -1,0 +1,61 @@
+{
+  "execution_time": "2026-10-13T22:30:11.615351",
+  "total_raw_rows": 151439,
+  "files_processed": {
+    "application_details_granted_2016.csv": 8064,
+    "application_details_granted_2017.csv": 12306,
+    "application_details_granted_2018.csv": 13455,
+    "application_details_granted_2019.csv": 22695,
+    "application_details_granted_2020.csv": 24465,
+    "application_details_granted_2021.csv": 28971,
+    "application_details_granted_2022.csv": 30499,
+    "application_details_granted_2023.csv": 10984
+  },
+  "exact_duplicates_removed": 0,
+  "invalid_rows_discarded": 1,
+  "id_duplicates_resolved": 0,
+  "total_valid_cleaned_records": 151438,
+  "field_counts": {
+    "CHEMISTRY": 38871,
+    "MECHANICAL": 32828,
+    "ELECTRONICS": 14591,
+    "ELECTRICAL": 12199,
+    "COMMUNICATION": 7972,
+    "POLYMER": 7852,
+    "COMPUTER": 7342,
+    "PHYSICS": 7308,
+    "BIOTECHNOLOGY": 6016,
+    "BIOMEDICAL": 5232,
+    "METALLURGY": 3313,
+    "TEXTILE": 2369,
+    "BIOCHEMISTRY": 2055,
+    "CIVIL": 2017,
+    "FOOD": 1248,
+    "OTHER": 225
+  },
+  "location_counts": {
+    "Delhi": 57345,
+    "Chennai": 48987,
+    "Kolkata": 23368,
+    "Mumbai": 21738
+  },
+  "application_type_counts": {
+    "PCT NATIONAL PHASE APPLICATION": 102586,
+    "ORDINARY APPLICATION": 30848,
+    "CONVENTION APPLICATION": 15493,
+    "DIVISIONAL PCT NATIONAL PHASE APPLICATION": 2053,
+    "PATENT OF ADDITION FOR ORDINARY APPLICATION": 179,
+    "DIVISIONAL CONVENTION APPLICATION": 130,
+    "DIVISIONAL ORDINARY APPLICATION": 127,
+    "PATENT OF ADDITION FOR PCT NATIONAL PHASE APPLICATION": 18,
+    "PATENT OF ADDITION FOR CONVENTION APPLICATION": 4
+  },
+  "median_claims": 15.0,
+  "median_pages": 29.0,
+  "date_ranges": {
+    "earliest_filing": "1996-06-13",
+    "latest_filing": "2022-09-17",
+    "earliest_publication": "2016-01-01",
+    "latest_publication": "2023-03-31"
+  }
+}

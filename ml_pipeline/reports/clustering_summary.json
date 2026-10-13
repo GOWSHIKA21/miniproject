@@ -1,0 +1,169 @@
+{
+  "num_clusters": 10,
+  "svd_components": 50,
+  "explained_variance_ratio": 0.1,
+  "inertia": 8002.079582352486,
+  "clustering_time_seconds": 2.83,
+  "clusters": [
+    {
+      "cluster_id": 1,
+      "theme_label": "Cluster 1: Process, Methods, Vehicle",
+      "size": 13171,
+      "percentage": 12.44,
+      "top_keywords": [
+        "process",
+        "methods",
+        "vehicle",
+        "systems",
+        "assembly",
+        "structure",
+        "preparing",
+        "production"
+      ]
+    },
+    {
+      "cluster_id": 2,
+      "theme_label": "Cluster 2: Producing, Method Producing, Method",
+      "size": 2713,
+      "percentage": 2.56,
+      "top_keywords": [
+        "producing",
+        "method producing",
+        "method",
+        "process producing",
+        "process",
+        "compound",
+        "steel",
+        "acid"
+      ]
+    },
+    {
+      "cluster_id": 3,
+      "theme_label": "Cluster 3: Apparatus, Method Apparatus, Method",
+      "size": 6554,
+      "percentage": 6.19,
+      "top_keywords": [
+        "apparatus",
+        "method apparatus",
+        "method",
+        "apparatus method",
+        "methods",
+        "control",
+        "processing",
+        "methods apparatus"
+      ]
+    },
+    {
+      "cluster_id": 4,
+      "theme_label": "Cluster 4: Method, Manufacturing, Thereof",
+      "size": 16144,
+      "percentage": 15.25,
+      "top_keywords": [
+        "method",
+        "manufacturing",
+        "thereof",
+        "method manufacturing",
+        "production",
+        "method thereof",
+        "using",
+        "method preparing"
+      ]
+    },
+    {
+      "cluster_id": 5,
+      "theme_label": "Cluster 5: Preparation, Process Preparation, Process",
+      "size": 2150,
+      "percentage": 2.03,
+      "top_keywords": [
+        "preparation",
+        "process preparation",
+        "process",
+        "improved process",
+        "improved",
+        "thereof",
+        "preparation thereof",
+        "method preparation"
+      ]
+    },
+    {
+      "cluster_id": 6,
+      "theme_label": "Cluster 6: Composition, Composition Comprising, Comprising",
+      "size": 4241,
+      "percentage": 4.01,
+      "top_keywords": [
+        "composition",
+        "composition comprising",
+        "comprising",
+        "pharmaceutical",
+        "pharmaceutical composition",
+        "containing",
+        "resin",
+        "thereof"
+      ]
+    },
+    {
+      "cluster_id": 7,
+      "theme_label": "Cluster 7: Device, Method, Method Device",
+      "size": 10758,
+      "percentage": 10.16,
+      "top_keywords": [
+        "device",
+        "method",
+        "method device",
+        "device method",
+        "control",
+        "control device",
+        "electronic",
+        "electronic device"
+      ]
+    },
+    {
+      "cluster_id": 8,
+      "theme_label": "Cluster 8: Machine, Electric, Electric Machine",
+      "size": 1992,
+      "percentage": 1.88,
+      "top_keywords": [
+        "machine",
+        "electric",
+        "electric machine",
+        "electrical",
+        "rotating",
+        "electrical machine",
+        "spinning",
+        "washing"
+      ]
+    },
+    {
+      "cluster_id": 9,
+      "theme_label": "Cluster 9: Communication, Wireless, Wireless Communication",
+      "size": 2307,
+      "percentage": 2.18,
+      "top_keywords": [
+        "communication",
+        "wireless",
+        "wireless communication",
+        "method",
+        "mobile",
+        "station",
+        "network",
+        "communication method"
+      ]
+    },
+    {
+      "cluster_id": 10,
+      "theme_label": "Cluster 10: Compositions, Having, Comprising",
+      "size": 45819,
+      "percentage": 43.29,
+      "top_keywords": [
+        "compositions",
+        "having",
+        "comprising",
+        "compounds",
+        "based",
+        "novel",
+        "high",
+        "use"
+      ]
+    }
+  ]
+}
