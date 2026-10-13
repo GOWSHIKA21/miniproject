@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -9,6 +9,7 @@ import {
   addEdge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { api } from '../services/api';
 
 const initialNodes = [
   { id: '1', position: { x: 250, y: 50 }, data: { label: 'AI Crop Disease Detection' }, type: 'input', style: { background: '#4f46e5', color: 'white', borderRadius: '8px', border: 'none', padding: '10px 15px', fontWeight: 'bold' } },
@@ -29,14 +30,37 @@ const initialEdges = [
   { id: 'e1-7', source: '1', target: '7', label: 'classified as', style: { stroke: '#94a3b8' } },
 ];
 
-export default function GraphViewer() {
+export default function GraphViewer({ patentId }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadGraphData() {
+      try {
+        let res;
+        if (patentId) {
+          res = await api.getPatentGraph(patentId);
+        } else {
+          res = await api.getGraphSample();
+        }
+
+        if (isMounted && res && res.nodes && res.nodes.length > 0) {
+          setNodes(res.nodes);
+          setEdges(res.edges || []);
+        }
+      } catch (e) {
+        console.warn('Failed to load live graph, displaying default cluster:', e);
+      }
+    }
+    loadGraphData();
+    return () => { isMounted = false; };
+  }, [patentId]);
 
   const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
   return (
-    <div style={{ width: '100%', height: '500px' }} className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-inner">
+    <div style={{ width: '100%', height: '520px' }} className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-inner">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -48,10 +72,10 @@ export default function GraphViewer() {
       >
         <Controls />
         <MiniMap nodeStrokeColor={(n) => {
-          if (n.type === 'input') return '#4f46e5';
+          if (n.type === 'input' || n.data?.type === 'patent') return '#4f46e5';
           return '#cbd5e1';
         }} nodeColor={(n) => {
-          if (n.type === 'input') return '#4f46e5';
+          if (n.type === 'input' || n.data?.type === 'patent') return '#4f46e5';
           return '#fff';
         }} />
         <Background color="#94a3b8" gap={16} size={1} />

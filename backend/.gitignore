@@ -1,0 +1,29 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Pytest & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local data & model weights
+data/
+*.parquet
+*.bin
+*.pkl
+*.jsonl
+!id_map_template.json
+
+# IDE
+.vscode/
+.idea/

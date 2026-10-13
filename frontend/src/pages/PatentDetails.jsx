@@ -1,12 +1,51 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, BrainCircuit, Share2, FileText, User, Building2, Calendar, Tag, ShieldCheck, Zap, Globe } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, Share2, FileText, User, Building2, Calendar, Tag, ShieldCheck, Zap, Globe, Network, ArrowRight } from 'lucide-react';
 import { patents } from '../data/patents';
+import { api } from '../services/api';
+import GraphViewer from '../components/GraphViewer';
 
 export default function PatentDetails({ isDarkTheme }) {
   const { id } = useParams();
   const navigate = useNavigate();
   
-  const patent = patents.find(p => p.id === id);
+  const [patent, setPatent] = useState(() => patents.find(p => p.id === id) || null);
+  const [relatedPatents, setRelatedPatents] = useState([]);
+  const [loading, setLoading] = useState(!patent);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadData() {
+      setLoading(true);
+      try {
+        const fetched = await api.getPatentById(id);
+        if (isMounted && fetched) {
+          setPatent(fetched);
+        }
+        const related = await api.getRelatedPatents(id);
+        if (isMounted && related) {
+          setRelatedPatents(related);
+        }
+      } catch (err) {
+        console.warn('Failed to load patent from backend, using fallback:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    loadData();
+    return () => { isMounted = false; };
+  }, [id]);
+
+  if (loading && !patent) {
+    return (
+      <div className={`min-h-[70vh] flex flex-col items-center justify-center p-6 ${
+        isDarkTheme ? 'bg-[#120c24] text-white' : 'bg-[#f3eefc] text-[#2d1f56]'
+      }`}>
+        <div className="w-8 h-8 border-4 border-[#6b46c1] border-t-transparent rounded-full animate-spin mb-4" />
+        <h2 className="text-base font-semibold">Retrieving Patent Record...</h2>
+      </div>
+    );
+  }
 
   if (!patent) {
     return (
@@ -102,6 +141,56 @@ export default function PatentDetails({ isDarkTheme }) {
                 {patent.abstract}
               </p>
             </div>
+
+            {/* Knowledge Graph Neighborhood */}
+            <div className={`rounded-3xl p-6 sm:p-8 border shadow-md space-y-4 ${
+              isDarkTheme ? 'bg-[#18112e] border-[#2b1f4c]' : 'bg-white border-[#e9e1fa]'
+            }`}>
+              <h2 className="text-base font-bold flex items-center gap-2">
+                <Network className="w-4 h-4 text-[#6b46c1]" />
+                Knowledge Graph Neighborhood
+              </h2>
+              <p className={`text-xs ${isDarkTheme ? 'text-slate-400' : 'text-[#5a478c]'}`}>
+                Interactive visual subnetwork representing this patent's classification, location, and shared technical concepts.
+              </p>
+              <GraphViewer patentId={patent.id} />
+            </div>
+
+            {/* Related Patents from Knowledge Graph */}
+            {relatedPatents && relatedPatents.length > 0 && (
+              <div className={`rounded-3xl p-6 sm:p-8 border shadow-md space-y-4 ${
+                isDarkTheme ? 'bg-[#18112e] border-[#2b1f4c]' : 'bg-white border-[#e9e1fa]'
+              }`}>
+                <h2 className="text-base font-bold flex items-center gap-2">
+                  <Network className="w-4 h-4 text-[#6b46c1]" />
+                  Related Inventions via Concept Overlap ({relatedPatents.length})
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {relatedPatents.map((rel, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => navigate(`/patent/${encodeURIComponent(rel.patent_id)}`)}
+                      className={`p-3.5 rounded-2xl border cursor-pointer transition-all hover:scale-[1.01] ${
+                        isDarkTheme ? 'bg-[#231845] border-[#382969] hover:border-[#6b46c1]' : 'bg-[#f4effc] border-[#e2d5f8] hover:border-[#6b46c1]'
+                      }`}
+                    >
+                      <div className="font-mono text-[11px] font-bold text-[#6b46c1] mb-1">
+                        {rel.patent_id}
+                      </div>
+                      <div className="text-xs font-semibold line-clamp-2 mb-2">
+                        {rel.title}
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-purple-200/20">
+                        <span>{rel.field}</span>
+                        <span className="text-[#6b46c1] font-bold flex items-center gap-1">
+                          {rel.shared_concepts_count} shared concepts <ArrowRight className="w-2.5 h-2.5" />
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Sidebar Metadata */}

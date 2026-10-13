@@ -4,6 +4,7 @@ import FilterPanel from '../components/FilterPanel';
 import PatentCard from '../components/PatentCard';
 import SearchBar from '../components/SearchBar';
 import { patents } from '../data/patents';
+import { api } from '../services/api';
 import { Search as SearchIcon, SlidersHorizontal, Sparkles, RotateCcw } from 'lucide-react';
 
 export default function Search({ isDarkTheme }) {
@@ -39,11 +40,31 @@ export default function Search({ isDarkTheme }) {
     }
   }, [initialTech]);
 
-  // Execute Search & Filter logic
+  // Execute Search & Filter logic against real FastAPI backend
   useEffect(() => {
     setIsSearching(true);
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
+      try {
+        const backendResults = await api.search(query, filters, 40, 'hybrid');
+        if (backendResults && backendResults.length > 0) {
+          let sorted = [...backendResults];
+          if (sortBy === 'newest') {
+            sorted.sort((a, b) => new Date(b.filingDate || 0) - new Date(a.filingDate || 0));
+          } else if (sortBy === 'oldest') {
+            sorted.sort((a, b) => new Date(a.filingDate || 0) - new Date(b.filingDate || 0));
+          } else {
+            sorted.sort((a, b) => (b.relevance || 0) - (a.relevance || 0));
+          }
+          setResults(sorted);
+          setIsSearching(false);
+          return;
+        }
+      } catch (e) {
+        console.warn('Backend search error, falling back to local dataset:', e);
+      }
+
+      // Fallback local filtering
       let filtered = [...patents];
 
       // 1. Natural Query

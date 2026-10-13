@@ -1,17 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ALL_TECHNOLOGIES, patents } from '../data/patents';
+import { api } from '../services/api';
 import { Cpu, Search, ArrowUpRight, Layers, Sparkles } from 'lucide-react';
 
 export default function Explorer({ isDarkTheme }) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [backendStats, setBackendStats] = useState(null);
+
+  useEffect(() => {
+    async function loadStats() {
+      const data = await api.getStats();
+      if (data && data.field_counts) {
+        setBackendStats(data);
+      }
+    }
+    loadStats();
+  }, []);
 
   const techStats = ALL_TECHNOLOGIES.map(tech => {
+    // If real backend count exists for this domain, use it!
+    const upperTech = tech.toUpperCase();
+    const realCount = backendStats?.field_counts?.[upperTech];
     const matchingPatents = patents.filter(p => p.technology.includes(tech));
+
     return {
       name: tech,
-      count: matchingPatents.length + Math.floor(Math.abs(Math.sin(tech.length * 7)) * 42) + 8,
+      count: realCount !== undefined ? realCount : (matchingPatents.length + Math.floor(Math.abs(Math.sin(tech.length * 7)) * 42) + 8),
       recentCount: Math.floor(Math.abs(Math.cos(tech.length * 3)) * 12) + 2,
     };
   });
