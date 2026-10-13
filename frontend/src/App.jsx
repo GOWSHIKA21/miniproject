@@ -13,14 +13,16 @@ function App() {
   const [isDarkTheme, setIsDarkTheme] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Apply theme class to body
+  // Apply theme class to html and body
   useEffect(() => {
     if (isDarkTheme) {
-      document.body.classList.add('theme-dark');
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('theme-dark', 'dark');
       document.body.classList.remove('theme-light');
     } else {
+      document.documentElement.classList.remove('dark');
       document.body.classList.add('theme-light');
-      document.body.classList.remove('theme-dark');
+      document.body.classList.remove('theme-dark', 'dark');
     }
   }, [isDarkTheme]);
 

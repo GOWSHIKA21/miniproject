@@ -4,14 +4,13 @@ import {
   Home, 
   Search, 
   Cpu, 
-  Network, 
   Bot, 
   Sun, 
   Moon, 
   Menu, 
-  X,
-  ChevronLeft,
-  ChevronRight
+  X, 
+  ChevronLeft, 
+  ChevronRight 
 } from 'lucide-react';
 
 export default function Sidebar({ isDarkTheme, setIsDarkTheme, isCollapsed, setIsCollapsed }) {
@@ -22,7 +21,6 @@ export default function Sidebar({ isDarkTheme, setIsDarkTheme, isCollapsed, setI
     { name: 'Home', path: '/', icon: Home },
     { name: 'Patent Search', path: '/search', icon: Search },
     { name: 'Technology Explorer', path: '/explorer', icon: Cpu },
-    { name: 'Patent Graph', path: '/graph', icon: Network },
     { name: 'AI Assistance', path: '/assistant', icon: Bot },
   ];
 
@@ -126,7 +124,9 @@ export default function Sidebar({ isDarkTheme, setIsDarkTheme, isCollapsed, setI
                   onClick={() => setMobileOpen(false)}
                   className={`flex items-center px-4 py-3 rounded-2xl font-semibold text-sm transition-all duration-200 group ${
                     isActive
-                      ? 'bg-[#6b46c1] text-white shadow-md shadow-purple-900/30'
+                      ? isDarkTheme
+                        ? 'bg-[#6b46c1] text-white shadow-md shadow-purple-900/30'
+                        : 'bg-[#efe6fd] text-[#5c3ea1] font-bold shadow-xs'
                       : isDarkTheme
                         ? 'text-slate-300 hover:bg-[#251947] hover:text-white'
                         : 'text-[#4a367c] hover:bg-[#f4effc] hover:text-[#6b46c1]'
@@ -134,7 +134,9 @@ export default function Sidebar({ isDarkTheme, setIsDarkTheme, isCollapsed, setI
                   title={isCollapsed ? item.name : undefined}
                 >
                   <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 ${
-                    isActive ? 'text-white scale-110' : 'text-[#6b46c1] group-hover:scale-105'
+                    isActive 
+                      ? isDarkTheme ? 'text-white scale-110' : 'text-[#5c3ea1] scale-110' 
+                      : 'text-[#6b46c1] group-hover:scale-105'
                   }`} />
 
                   {(!isCollapsed || mobileOpen) && (

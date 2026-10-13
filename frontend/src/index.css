@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-purple-50: #f7f3fe;
   --color-purple-100: #eee5fc;
@@ -53,3 +55,68 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(107, 70, 193, 0.5);
 }
+
+/* Magnifying Glass Zooming In & Out Animation */
+@keyframes zoomInOut {
+  0% {
+    transform: scale(1) translateY(0px) rotate(0deg);
+    filter: drop-shadow(0 20px 30px rgba(107, 70, 193, 0.15));
+  }
+  50% {
+    transform: scale(1.08) translateY(-14px) rotate(-1.5deg);
+    filter: drop-shadow(0 30px 45px rgba(107, 70, 193, 0.28));
+  }
+  100% {
+    transform: scale(1) translateY(0px) rotate(0deg);
+    filter: drop-shadow(0 20px 30px rgba(107, 70, 193, 0.15));
+  }
+}
+
+@keyframes innerLensZoom {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes floatKeyword {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.03);
+  }
+}
+
+@keyframes nodePulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.4);
+  }
+}
+
+.animate-zoom-in-out {
+  animation: zoomInOut 6s ease-in-out infinite;
+}
+
+.animate-lens-text {
+  animation: innerLensZoom 6s ease-in-out infinite;
+}
+
+.animate-float-keyword {
+  animation: floatKeyword 7s ease-in-out infinite;
+}
+
+.animate-node-pulse {
+  animation: nodePulse 4s ease-in-out infinite;
+}
+
