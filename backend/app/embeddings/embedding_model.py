@@ -11,7 +11,10 @@ class PatentEmbeddingModel:
         self.model_name = model_name
         logger.info(f"Loading Sentence Transformer model: {model_name}...")
         self.model = SentenceTransformer(model_name)
-        self.dimension = self.model.get_sentence_embedding_dimension()
+        if hasattr(self.model, "get_embedding_dimension"):
+            self.dimension = self.model.get_embedding_dimension()
+        else:
+            self.dimension = self.model.get_sentence_embedding_dimension()
         logger.info(f"Embedding model loaded. Dimension: {self.dimension}")
 
     def encode(self, texts: Union[str, List[str]], batch_size: int = 64, show_progress: bool = False) -> np.ndarray:

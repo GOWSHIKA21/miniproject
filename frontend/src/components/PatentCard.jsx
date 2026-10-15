@@ -47,7 +47,7 @@ export default function PatentCard({ patent, isDarkTheme }) {
             </div>
 
             <h3 
-              onClick={() => navigate(`/patent/${patent.id}`)}
+              onClick={() => navigate(`/patent/${encodeURIComponent(patent.id)}`)}
               className={`text-lg font-bold group-hover:text-[#6b46c1] transition-colors cursor-pointer leading-snug mt-1 ${
                 isDarkTheme ? 'text-white' : 'text-[#2d1f56]'
               }`}
@@ -110,7 +110,7 @@ export default function PatentCard({ patent, isDarkTheme }) {
       {/* Footer Actions */}
       <div className="pt-3 border-t border-[#e9e1fa]/40 flex items-center justify-between gap-2">
         <button
-          onClick={() => navigate(`/patent/${patent.id}`)}
+          onClick={() => navigate(`/patent/${encodeURIComponent(patent.id)}`)}
           className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#6b46c1] hover:bg-[#553c9a] text-white rounded-xl text-xs font-bold transition-all shadow-xs"
         >
           View Patent
@@ -118,7 +118,7 @@ export default function PatentCard({ patent, isDarkTheme }) {
         </button>
 
         <button
-          onClick={() => navigate(`/graph?patentId=${patent.id}`)}
+          onClick={() => navigate(`/graph?patentId=${encodeURIComponent(patent.id)}`)}
           className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#f3eefc] dark:bg-[#231845] text-[#6b46c1] dark:text-purple-200 hover:bg-[#6b46c1] hover:text-white rounded-xl text-xs font-semibold border border-[#e2d5f8] dark:border-[#382969] transition-colors"
         >
           <Network className="w-3.5 h-3.5" />

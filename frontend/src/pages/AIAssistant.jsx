@@ -1,31 +1,75 @@
-import { useState } from 'react';
-import { Bot, Send, Sparkles, FileText, HelpCircle, Layers, ArrowRight, User, CheckCircle2, ExternalLink } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { patents } from '../data/patents';
+import { useState, useEffect, useRef } from 'react';
+import { Bot, Send, Sparkles, FileText, HelpCircle, Layers, ArrowRight, User, CheckCircle2, ExternalLink, RotateCcw } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
+
+const DEFAULT_WELCOME_MESSAGE = {
+  id: 'welcome',
+  sender: 'ai',
+  text: 'Hello! I am your PatentGraph AI Assistant. I can help you query granted Indian patents from 2016-2018, summarize patent specifications, explore technical domains, and retrieve official InPASS gazette evidence. How can I assist your patent research today?'
+};
+
+const STORAGE_KEY = 'patentgraph_ai_chat_history';
 
 export default function AIAssistant({ isDarkTheme }) {
   const navigate = useNavigate();
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      sender: 'ai',
-      text: 'Hello! I am your PatentGraph AI Assistant. I can help you search Indian patents, summarize granted applications, explain technical terms, and retrieve official InPASS gazette evidence. How can I assist your patent research today?'
+  const [searchParams] = useSearchParams();
+  const initialPrompt = searchParams.get('q');
+  const hasTriggeredInitial = useRef(false);
+  const messagesEndRef = useRef(null);
+
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse chat history from localStorage', e);
     }
-  ]);
+    return [DEFAULT_WELCOME_MESSAGE];
+  });
   const [inputQuery, setInputQuery] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+
+  // Sync messages to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } catch (e) {
+      console.warn('Failed to save chat history to localStorage', e);
+    }
+  }, [messages]);
+
+  // Smooth auto-scroll on new messages or thinking state
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isThinking]);
+
+  const handleClearChat = () => {
+    const freshWelcome = [{ ...DEFAULT_WELCOME_MESSAGE, id: Date.now() }];
+    setMessages(freshWelcome);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      console.warn('Failed to remove chat history from localStorage', e);
+    }
+  };
 
   const quickPrompts = [
     "Patents related to lithium ion battery anodes",
     "Surgical cutting and fastening devices",
-    "Wind turbine power converters",
-    "Hydraulic braking modulators"
+    "Pharmaceutical compositions for melt containers",
+    "Wind turbine electric power generation"
   ];
 
   const handleSend = async (textToSend) => {
-    const query = textToSend || inputQuery;
-    if (!query.trim()) return;
+    if (isThinking) return;
+    const query = (textToSend || inputQuery).trim();
+    if (!query) return;
 
     // Add user message
     const userMsg = { id: Date.now(), sender: 'user', text: query };
@@ -33,8 +77,17 @@ export default function AIAssistant({ isDarkTheme }) {
     if (!textToSend) setInputQuery('');
     setIsThinking(true);
 
+    // Extract recent history for multi-turn RAG context
+    const historyForBackend = messages
+      .filter(m => m.id !== 'welcome' && (m.sender === 'user' || m.sender === 'ai'))
+      .slice(-6)
+      .map(m => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        content: m.text
+      }));
+
     try {
-      const ragRes = await api.askQuestion(query);
+      const ragRes = await api.askQuestion(query, historyForBackend);
       if (ragRes && ragRes.answer) {
         const aiMsg = {
           id: Date.now() + 1,
@@ -49,16 +102,27 @@ export default function AIAssistant({ isDarkTheme }) {
         return;
       }
     } catch (err) {
-      console.warn('RAG backend failed, using local fallback:', err);
+      console.warn('RAG backend error:', err);
     }
 
-    // Local fallback
-    setTimeout(() => {
-      let aiResponseText = `Based on your query "${query}", I analyzed available patent indexes. Found related records under IPC classifications. Try searching specific patent terms like "battery", "turbine", or "sensor".`;
-      setMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: aiResponseText }]);
-      setIsThinking(false);
-    }, 650);
+    // Honest fallback when backend service is unreachable
+    setMessages(prev => [
+      ...prev,
+      {
+        id: Date.now() + 1,
+        sender: 'ai',
+        text: 'The PatentGraph backend RAG service is currently unavailable or returned no grounded evidence for this query. Please ensure the FastAPI backend is running locally on port 8000.'
+      }
+    ]);
+    setIsThinking(false);
   };
+
+  useEffect(() => {
+    if (initialPrompt && !hasTriggeredInitial.current) {
+      hasTriggeredInitial.current = true;
+      handleSend(initialPrompt);
+    }
+  }, [initialPrompt]);
 
   return (
     <div className={`min-h-[calc(100vh-4rem)] p-4 sm:p-6 lg:p-10 flex flex-col justify-between ${
@@ -84,6 +148,19 @@ export default function AIAssistant({ isDarkTheme }) {
               </p>
             </div>
           </div>
+
+          <button
+            onClick={handleClearChat}
+            title="Clear chat conversation"
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+              isDarkTheme
+                ? 'bg-[#1e153a] hover:bg-[#2b1f4c] text-purple-300 border-[#382969]'
+                : 'bg-white hover:bg-slate-100 text-[#6b46c1] border-[#e2d5f8] shadow-xs'
+            }`}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Clear Chat</span>
+          </button>
         </div>
 
         {/* Chat Messages Container */}
@@ -131,6 +208,13 @@ export default function AIAssistant({ isDarkTheme }) {
                     </div>
                   </div>
                 )}
+
+                {msg.provider && (
+                  <div className="mt-2.5 pt-2 border-t border-purple-300/20 text-[10px] text-purple-400 font-mono opacity-80 flex items-center gap-1">
+                    <span>Engine:</span>
+                    <span className="font-semibold">{msg.provider}</span>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -141,6 +225,7 @@ export default function AIAssistant({ isDarkTheme }) {
               Analyzing patent repository embeddings...
             </div>
           )}
+          <div ref={messagesEndRef} />
         </div>
 
         {/* Quick Suggestion Chips */}
@@ -167,10 +252,11 @@ export default function AIAssistant({ isDarkTheme }) {
         >
           <input
             type="text"
-            placeholder="Ask AI anything about patents, technical terms, or claim comparisons..."
+            placeholder={isThinking ? "Analyzing patent evidence, please wait..." : "Ask AI anything about patents, technical terms, or claim comparisons..."}
             value={inputQuery}
+            disabled={isThinking}
             onChange={(e) => setInputQuery(e.target.value)}
-            className={`w-full rounded-2xl pl-4 pr-14 py-3.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#6b46c1] border shadow-md ${
+            className={`w-full rounded-2xl pl-4 pr-14 py-3.5 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#6b46c1] border shadow-md disabled:opacity-60 ${
               isDarkTheme
                 ? 'bg-[#18112e] border-[#2b1f4c] text-white placeholder-slate-400'
                 : 'bg-white border-[#e9e1fa] text-[#2d1f56] placeholder-slate-400'
@@ -178,7 +264,8 @@ export default function AIAssistant({ isDarkTheme }) {
           />
           <button
             type="submit"
-            className="absolute right-2 p-2.5 rounded-xl bg-[#6b46c1] hover:bg-[#553c9a] text-white transition-all"
+            disabled={isThinking || !inputQuery.trim()}
+            className="absolute right-2 p-2.5 rounded-xl bg-[#6b46c1] hover:bg-[#553c9a] disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all cursor-pointer"
           >
             <Send className="w-4 h-4" />
           </button>

@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 from typing import Dict, Any, List, Optional
 import pandas as pd
@@ -127,5 +128,71 @@ class PatentService:
             "location_counts": loc_counts,
             "application_types": app_type_counts
         }
+
+    def search_fallback(
+        self,
+        query_text: Optional[str] = None,
+        filters: Optional[Dict[str, Any]] = None,
+        sort_by: str = "relevance",
+        page: int = 1,
+        page_size: int = 25
+    ) -> tuple[int, List[Dict[str, Any]]]:
+        """In-memory Parquet fallback search with filter support, counting, and pagination."""
+        df = self._get_fallback_df()
+        if df.empty:
+            return (0, [])
+
+        mask = pd.Series(True, index=df.index)
+
+        if filters:
+            # 1. Tech domains
+            techs = filters.get("fields_of_invention") or ([filters.get("field_of_invention")] if filters.get("field_of_invention") else [])
+            techs = [t for t in techs if t and str(t).upper() != "ALL"]
+            if techs:
+                pattern = "|".join(re.escape(str(t).strip()) for t in techs)
+                mask &= df["field_of_invention"].astype(str).str.contains(pattern, case=False, na=False)
+
+            # 2. Location
+            office = filters.get("ipo_location")
+            if office and str(office).upper() not in ("ALL", "ALL PATENT OFFICES", ""):
+                mask &= df["ipo_location"].astype(str).str.contains(re.escape(str(office).strip()), case=False, na=False)
+
+            # 3. Dates
+            exact_date = filters.get("exact_date")
+            priority_date = filters.get("priority_date")
+            date_from = filters.get("date_from")
+            date_to = filters.get("date_to")
+
+            if exact_date:
+                mask &= (df["publication_date"] == exact_date) | (df["filing_date"] == exact_date)
+            elif priority_date:
+                mask &= (df["filing_date"] == priority_date) | (df["publication_date"] == priority_date)
+            else:
+                if date_from:
+                    mask &= (df["publication_date"] >= date_from) | (df["filing_date"] >= date_from)
+                if date_to:
+                    mask &= (df["publication_date"] <= date_to) | (df["filing_date"] <= date_to)
+
+        if query_text and query_text.strip() and query_text.strip().lower() not in ("patent invention", "all", "*"):
+            q_clean = re.escape(query_text.strip())
+            mask &= (
+                df["patent_id"].astype(str).str.contains(q_clean, case=False, na=False) |
+                df["title"].astype(str).str.contains(q_clean, case=False, na=False) |
+                df["search_text"].astype(str).str.contains(q_clean, case=False, na=False)
+            )
+
+        filtered = df[mask]
+        total = len(filtered)
+        if total == 0:
+            return (0, [])
+
+        if sort_by == "newest":
+            filtered = filtered.sort_values(by=["filing_date", "publication_date"], ascending=[False, False])
+        elif sort_by == "oldest":
+            filtered = filtered.sort_values(by=["filing_date", "publication_date"], ascending=[True, True])
+
+        start_idx = max(0, (page - 1) * page_size)
+        page_df = filtered.iloc[start_idx : start_idx + page_size]
+        return (total, page_df.to_dict(orient="records"))
 
 patent_service = PatentService()

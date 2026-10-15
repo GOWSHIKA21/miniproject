@@ -1,21 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, BrainCircuit, Share2, FileText, User, Building2, Calendar, Tag, ShieldCheck, Zap, Globe, Network, ArrowRight } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, Share2, Check, FileText, User, Building2, Calendar, Tag, ShieldCheck, Zap, Globe, Network, ArrowRight } from 'lucide-react';
 import { patents } from '../data/patents';
 import { api } from '../services/api';
 import GraphViewer from '../components/GraphViewer';
 
 export default function PatentDetails({ isDarkTheme }) {
-  const { id } = useParams();
+  const params = useParams();
+  const rawId = params['*'] || params.id || '';
+  const id = decodeURIComponent(rawId);
   const navigate = useNavigate();
   
   const [patent, setPatent] = useState(() => patents.find(p => p.id === id) || null);
   const [relatedPatents, setRelatedPatents] = useState([]);
-  const [loading, setLoading] = useState(!patent);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
+      if (!id) return;
       setLoading(true);
       try {
         const fetched = await api.getPatentById(id);
@@ -27,7 +31,7 @@ export default function PatentDetails({ isDarkTheme }) {
           setRelatedPatents(related);
         }
       } catch (err) {
-        console.warn('Failed to load patent from backend, using fallback:', err);
+        console.warn('Failed to load patent from backend:', err);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -35,6 +39,16 @@ export default function PatentDetails({ isDarkTheme }) {
     loadData();
     return () => { isMounted = false; };
   }, [id]);
+
+  const handleShare = () => {
+    try {
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.warn('Clipboard write error:', e);
+    }
+  };
 
   if (loading && !patent) {
     return (
@@ -81,12 +95,25 @@ export default function PatentDetails({ isDarkTheme }) {
           </button>
           
           <button 
-            onClick={() => alert('Patent link copied!')}
-            className={`p-2 rounded-xl border transition-colors ${
-              isDarkTheme ? 'bg-[#18112e] border-[#2b1f4c] text-white' : 'bg-white border-[#e9e1fa] text-[#2d1f56]'
+            onClick={handleShare}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${
+              copied
+                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30 font-bold'
+                : isDarkTheme ? 'bg-[#18112e] border-[#2b1f4c] text-white hover:border-[#6b46c1]' : 'bg-white border-[#e9e1fa] text-[#2d1f56] hover:border-[#6b46c1]'
             }`}
+            title="Copy patent link to clipboard"
           >
-            <Share2 className="w-4 h-4" />
+            {copied ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Link Copied!</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Share</span>
+              </>
+            )}
           </button>
         </div>
 
@@ -206,8 +233,8 @@ export default function PatentDetails({ isDarkTheme }) {
               </h3>
               
               <button 
-                onClick={() => navigate('/assistant')}
-                className="w-full flex items-center justify-center gap-2 bg-[#6b46c1] hover:bg-[#553c9a] text-white px-4 py-2.5 rounded-xl font-bold text-xs transition-all"
+                onClick={() => navigate(`/assistant?q=${encodeURIComponent(`Tell me about granted patent ${patent.patentNumber}: ${patent.title}`)}`)}
+                className="w-full flex items-center justify-center gap-2 bg-[#6b46c1] hover:bg-[#553c9a] text-white px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer"
               >
                 <BrainCircuit className="w-4 h-4" />
                 Ask AI Assistant About Patent

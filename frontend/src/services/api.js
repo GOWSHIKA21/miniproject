@@ -27,20 +27,31 @@ export const api = {
     }
   },
 
-  // Hybrid search with metadata filters
-  async search(query = '', filters = {}, topK = 20, method = 'hybrid') {
+  // Hybrid search with metadata filters and server-side pagination
+  async search(query = '', filters = {}, page = 1, pageSize = 25, sortBy = 'relevance', method = 'hybrid') {
     try {
+      const selectedTechs = filters.selectedTechnologies || [];
       const payload = {
-        query: query.trim() || 'patent invention',
+        query: query ? query.trim() : '',
         filters: {
-          field_of_invention: filters.field_of_invention || (filters.selectedTechnologies && filters.selectedTechnologies[0]) || null,
-          ipo_location: filters.patentOffice && filters.patentOffice !== 'All' ? filters.patentOffice : (filters.ipo_location || null),
+          field_of_invention: selectedTechs.length === 1 ? selectedTechs[0] : (filters.field_of_invention || null),
+          fields_of_invention: selectedTechs.length > 0 ? selectedTechs : null,
+          ipo_location: filters.patentOffice && filters.patentOffice !== 'All' && filters.patentOffice !== 'All Patent Offices' 
+            ? filters.patentOffice 
+            : (filters.ipo_location || null),
+          inventor: filters.inventor ? filters.inventor.trim() : null,
+          organization: filters.organization ? filters.organization.trim() : null,
           application_type: filters.application_type || null,
+          date_type: filters.dateType || null,
+          priority_date: filters.priorityDate || null,
+          exact_date: filters.exactDate || null,
           date_from: filters.dateFrom || null,
           date_to: filters.dateTo || null,
           status: filters.status && filters.status !== 'All' ? filters.status : null
         },
-        top_k: topK,
+        page: page,
+        page_size: pageSize,
+        sort_by: sortBy,
         retrieval_method: method
       };
 
@@ -52,13 +63,25 @@ export const api = {
 
       if (!res.ok) throw new Error(`Search error ${res.status}`);
       const data = await res.json();
-      return data.results.map(r => ({
-        ...r.patent,
-        relevanceScore: r.score,
-        retrievalMethod: r.retrieval_method,
-        matchEvidence: r.match_evidence,
-        provenance: r.provenance
-      }));
+      const total = data.total_found ?? data.total_matching ?? (data.results ? data.results.length : 0);
+      const effectivePage = data.page ?? page;
+      const effectivePageSize = data.page_size ?? pageSize;
+      const totalPages = data.total_pages ?? Math.ceil(total / effectivePageSize);
+
+      return {
+        total: total,
+        totalMatching: total,
+        page: effectivePage,
+        pageSize: effectivePageSize,
+        totalPages: Math.max(1, totalPages),
+        results: (data.results || []).map(r => ({
+          ...r.patent,
+          relevanceScore: r.score,
+          retrievalMethod: r.retrieval_method,
+          matchEvidence: r.match_evidence,
+          provenance: r.provenance
+        }))
+      };
     } catch (err) {
       console.error('Search request failed:', err);
       return null;

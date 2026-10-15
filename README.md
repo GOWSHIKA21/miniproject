@@ -24,7 +24,7 @@ flowchart TD
     end
     
     subgraph RAG & Verification
-        Evidence --> LLM[LLM Synthesizer Gemini / OpenAI / Offline Grounded]
+        Evidence --> LLM[LLM Synthesizer Groq Llama 3.3 / Offline Grounded]
         LLM --> Verifier[Citation Verification Engine]
         Verifier --> Response[Verified Answer with Gazette Citations]
     end

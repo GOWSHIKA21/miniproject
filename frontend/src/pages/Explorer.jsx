@@ -20,15 +20,13 @@ export default function Explorer({ isDarkTheme }) {
   }, []);
 
   const techStats = ALL_TECHNOLOGIES.map(tech => {
-    // If real backend count exists for this domain, use it!
     const upperTech = tech.toUpperCase();
     const realCount = backendStats?.field_counts?.[upperTech];
-    const matchingPatents = patents.filter(p => p.technology.includes(tech));
 
     return {
       name: tech,
-      count: realCount !== undefined ? realCount : (matchingPatents.length + Math.floor(Math.abs(Math.sin(tech.length * 7)) * 42) + 8),
-      recentCount: Math.floor(Math.abs(Math.cos(tech.length * 3)) * 12) + 2,
+      count: realCount !== undefined ? realCount : (backendStats ? 0 : 12),
+      isReal: realCount !== undefined
     };
   });
 
@@ -111,9 +109,9 @@ export default function Explorer({ isDarkTheme }) {
                 </div>
 
                 <div className="pt-2 border-t border-[#e9e1fa]/30 flex items-center justify-between text-[11px]">
-                  <span className="text-teal-600 font-semibold flex items-center gap-1">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-[#6b46c1]" />
-                    +{tech.recentCount} this year
+                    Official IPO Domain
                   </span>
                   <span className="text-[#6b46c1] font-bold">Filter Search &rarr;</span>
                 </div>

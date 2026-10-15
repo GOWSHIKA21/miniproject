@@ -47,15 +47,25 @@ def normalize_field(field_val: Any) -> str:
     cleaned = str(field_val).strip().upper()
     return cleaned if cleaned else "GENERAL / UNCATEGORIZED"
 
-def run_preprocessing(dataset_dir: str = RAW_DATA_DIR, output_dir: str = OUTPUT_DIR) -> Dict[str, Any]:
-    """Ingest, clean, validate, and persist all Indian patent records."""
+def run_preprocessing(
+    dataset_dir: str = RAW_DATA_DIR,
+    output_dir: str = OUTPUT_DIR,
+    years: Optional[List[int]] = None,
+    output_filename: Optional[str] = None,
+    report_filename: Optional[str] = None
+) -> Dict[str, Any]:
+    """Ingest, clean, validate, and persist Indian patent records for specified or all years."""
     os.makedirs(output_dir, exist_ok=True)
-    csv_paths = sorted(glob.glob(os.path.join(dataset_dir, "*.csv")))
+    if years:
+        csv_paths = [os.path.join(dataset_dir, f"application_details_granted_{y}.csv") for y in sorted(years)]
+        csv_paths = [p for p in csv_paths if os.path.exists(p)]
+    else:
+        csv_paths = sorted(glob.glob(os.path.join(dataset_dir, "*.csv")))
     
     if not csv_paths:
         raise FileNotFoundError(f"No CSV files found in dataset directory: {dataset_dir}")
         
-    logger.info(f"Discovered {len(csv_paths)} CSV files in {dataset_dir}")
+    logger.info(f"Discovered {len(csv_paths)} CSV files in {dataset_dir} (target years: {years or 'all'}): {[os.path.basename(p) for p in csv_paths]}")
     
     dfs = []
     file_stats = {}
@@ -155,15 +165,16 @@ def run_preprocessing(dataset_dir: str = RAW_DATA_DIR, output_dir: str = OUTPUT_
     total_invalid = len(invalid_records)
     logger.info(f"Cleaned dataset: {total_valid:,} valid patents | {total_invalid} invalid records")
 
-    # Persist in Parquet and JSONL
-    parquet_path = os.path.join(output_dir, "cleaned_patents.parquet")
-    jsonl_path = os.path.join(output_dir, "cleaned_patents.jsonl")
+    # Persist in Parquet
+    target_parquet = output_filename or "cleaned_patents.parquet"
+    parquet_path = os.path.join(output_dir, target_parquet)
     cleaned_df.to_parquet(parquet_path, index=False)
     logger.info(f"Saved Parquet file: {parquet_path}")
 
     # Generate Validation Report
     report = {
         "execution_timestamp": datetime.now().isoformat(),
+        "years_selected": years if years else "all",
         "total_raw_rows_loaded": total_raw_records,
         "files_processed": file_stats,
         "exact_duplicates_removed": exact_duplicates,
@@ -186,13 +197,15 @@ def run_preprocessing(dataset_dir: str = RAW_DATA_DIR, output_dir: str = OUTPUT_
         }
     }
 
-    report_path = os.path.join(output_dir, "preprocessing_report.json")
+    target_report = report_filename or "preprocessing_report.json"
+    report_path = os.path.join(output_dir, target_report)
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
     logger.info(f"Saved Preprocessing Report: {report_path}")
 
     if invalid_records:
-        invalid_path = os.path.join(output_dir, "invalid_records_report.json")
+        inv_name = "invalid_records_report_2016_2018.json" if years else "invalid_records_report.json"
+        invalid_path = os.path.join(output_dir, inv_name)
         with open(invalid_path, "w", encoding="utf-8") as f:
             json.dump(invalid_records, f, indent=2)
         logger.info(f"Saved Invalid Records Report: {invalid_path}")
@@ -200,6 +213,17 @@ def run_preprocessing(dataset_dir: str = RAW_DATA_DIR, output_dir: str = OUTPUT_
     return report
 
 if __name__ == "__main__":
-    rep = run_preprocessing()
+    import argparse
+    parser = argparse.ArgumentParser(description="Ingest and clean Indian patent data.")
+    parser.add_argument("--years", nargs="+", type=int, default=[2016, 2017, 2018], help="Target years (e.g. 2016 2017 2018)")
+    parser.add_argument("--output-filename", type=str, default="cleaned_patents_2016_2018.parquet", help="Output parquet filename")
+    parser.add_argument("--report-filename", type=str, default="preprocessing_report_2016_2018.json", help="Report json filename")
+    args = parser.parse_args()
+
+    rep = run_preprocessing(
+        years=args.years,
+        output_filename=args.output_filename,
+        report_filename=args.report_filename
+    )
     print("Preprocessing completed successfully!")
     print(json.dumps(rep, indent=2))

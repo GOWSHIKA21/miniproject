@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ALL_TECHNOLOGIES, PATENT_OFFICES, STATUS_OPTIONS } from '../data/patents';
 import { Filter, Calendar, User, Building2, Cpu, Globe, CheckCircle2, X, Search, RotateCcw, ChevronDown } from 'lucide-react';
 
-export default function FilterPanel({ filters, setFilters, onReset, isDarkTheme }) {
+export default function FilterPanel({ filters, setFilters, onReset, onApply, isDarkTheme }) {
   // Local state for technology search inside multi-select dropdown
   const [techQuery, setTechQuery] = useState('');
   const [techDropdownOpen, setTechDropdownOpen] = useState(false);
@@ -399,6 +399,30 @@ export default function FilterPanel({ filters, setFilters, onReset, isDarkTheme 
             );
           })}
         </div>
+      </div>
+
+      {/* 7. Action Controls: Apply & Clear */}
+      <div className="pt-3 border-t border-[#e9e1fa]/40 space-y-2">
+        <button
+          type="button"
+          onClick={onApply}
+          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#6b46c1] hover:bg-[#553c9a] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+        >
+          <Search className="w-3.5 h-3.5" />
+          Apply Filters
+        </button>
+        <button
+          type="button"
+          onClick={onReset}
+          className={`w-full flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+            isDarkTheme 
+              ? 'border-[#382969] text-slate-400 hover:text-white hover:bg-[#231845]' 
+              : 'border-[#e2d5f8] text-slate-500 hover:text-[#6b46c1] hover:bg-[#f4effc]'
+          }`}
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          Clear All Filters
+        </button>
       </div>
 
     </div>

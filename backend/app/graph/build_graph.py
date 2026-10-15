@@ -39,7 +39,7 @@ def extract_technical_concepts(title: str, max_concepts: int = 4) -> List[str]:
 
     return concepts[:max_concepts]
 
-def build_knowledge_graph(limit: int = 25000) -> nx.MultiDiGraph:
+def build_knowledge_graph(limit: int = 0) -> nx.MultiDiGraph:
     """Build heterogeneous Patent Knowledge Graph and persist as NetworkX MultiDiGraph and Neo4j."""
     data_path = settings.CLEANED_DATA_PATH
     if not os.path.exists(data_path):
@@ -48,7 +48,7 @@ def build_knowledge_graph(limit: int = 25000) -> nx.MultiDiGraph:
     logger.info(f"Loading cleaned patents from {data_path} for Knowledge Graph construction...")
     df = pd.read_parquet(data_path)
     
-    if limit and limit < len(df):
+    if limit and 0 < limit < len(df):
         df = df.sample(n=limit, random_state=42)
         logger.info(f"Building graph on sample of {len(df):,} patents...")
     else:
@@ -133,4 +133,8 @@ def build_knowledge_graph(limit: int = 25000) -> nx.MultiDiGraph:
     return G
 
 if __name__ == "__main__":
-    build_knowledge_graph(limit=25000)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=0, help="Number of patents to include in graph (0 for all)")
+    args = parser.parse_args()
+    build_knowledge_graph(limit=args.limit)

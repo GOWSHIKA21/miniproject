@@ -1,9 +1,18 @@
 import os
+from pathlib import Path
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_backend_dir = Path(__file__).resolve().parent.parent.parent
+_env_paths = [
+    str(_backend_dir / ".env"),
+    str(_backend_dir.parent / ".env"),
+    ".env",
+    "backend/.env"
+]
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="allow")
+    model_config = SettingsConfigDict(env_file=_env_paths, extra="allow")
 
     PROJECT_NAME: str = "PatentGraph AI - Indian Patent Intelligence"
     VERSION: str = "1.0.0"
@@ -32,12 +41,18 @@ class Settings(BaseSettings):
     DATA_DIR: str = "backend/app/data"
     CLEANED_DATA_PATH: str = "backend/app/data/cleaned_patents.parquet"
     FAISS_INDEX_PATH: str = "backend/app/data/faiss_index.bin"
+    FAISS_ID_MAP_PATH: str = "backend/app/data/faiss_id_map.json"
     BM25_INDEX_PATH: str = "backend/app/data/bm25_index.pkl"
     GRAPH_STORE_PATH: str = "backend/app/data/knowledge_graph.pkl"
 
-    # LLM Settings
-    LLM_PROVIDER: str = "gemini"
-    GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    # Groq LLM Settings
+    LLM_PROVIDER: str = "groq"
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "qwen/qwen3.8-27b"
+
+    # RAG Settings
+    RAG_TOP_K: int = 5
+    RAG_SIMILARITY_THRESHOLD: float = 0.25
+    RAG_MAX_CONTEXT_TOKENS: int = 2000
 
 settings = Settings()

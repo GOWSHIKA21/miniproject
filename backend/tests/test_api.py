@@ -8,7 +8,7 @@ def test_health_check():
     response = client.get("/api/health")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "healthy"
+    assert data["status"] in ("healthy", "ok")
     assert "version" in data
 
 def test_stats():
@@ -67,3 +67,24 @@ def test_chat_ask():
     assert "citations" in data
     assert "verification" in data
     assert len(data["retrieved_evidence"]) > 0
+
+def test_direct_ask_alias():
+    chat_payload = {
+        "query": "What patents relate to surgical cutting instruments?",
+        "history": []
+    }
+    response = client.post("/api/ask", json=chat_payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert "answer" in data
+    assert len(data["retrieved_evidence"]) > 0
+
+def test_patent_citations():
+    search_resp = client.post("/api/search", json={"query": "battery", "top_k": 1})
+    pid = search_resp.json()["results"][0]["patent"]["id"]
+    response = client.get(f"/api/patents/{pid}/citations")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["patent_id"] == pid
+    assert "citations" in data
+

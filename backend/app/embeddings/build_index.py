@@ -31,11 +31,11 @@ def build_indices(limit: int = 15000, batch_size: int = 256):
     total_available = len(df)
     logger.info(f"Total available patents: {total_available:,}")
 
-    if limit and limit < total_available:
-        # Balanced sampling across publication years to ensure 2016-2023 coverage
-        df["pub_year"] = pd.to_datetime(df["publication_date"], errors="coerce").dt.year.fillna(2020).astype(int)
+    if limit and 0 < limit < total_available:
+        # Balanced sampling across publication years
+        df["pub_year"] = pd.to_datetime(df["publication_date"], errors="coerce").dt.year.fillna(2017).astype(int)
         sampled_dfs = []
-        target_per_year = limit // df["pub_year"].nunique()
+        target_per_year = limit // max(df["pub_year"].nunique(), 1)
         for yr, group in df.groupby("pub_year"):
             sampled_dfs.append(group.sample(n=min(len(group), target_per_year), random_state=42))
         indexed_df = pd.concat(sampled_dfs, ignore_index=True)
@@ -44,10 +44,10 @@ def build_indices(limit: int = 15000, batch_size: int = 256):
             remaining = df[~df["patent_id"].isin(indexed_df["patent_id"])]
             more = remaining.sample(n=min(len(remaining), limit - len(indexed_df)), random_state=42)
             indexed_df = pd.concat([indexed_df, more], ignore_index=True)
-        logger.info(f"Sampled representative set of {len(indexed_df):,} patents across all years (2016-2023)")
+        logger.info(f"Sampled representative set of {len(indexed_df):,} patents across years ({df['pub_year'].min()}-{df['pub_year'].max()})")
     else:
         indexed_df = df
-        logger.info(f"Indexing full dataset of {len(indexed_df):,} patents")
+        logger.info(f"Indexing full review dataset of {len(indexed_df):,} patents")
 
     # Texts for embedding and BM25
     texts = indexed_df["search_text"].tolist()
@@ -110,7 +110,8 @@ def build_indices(limit: int = 15000, batch_size: int = 256):
         "bm25_file": settings.BM25_INDEX_PATH,
         "timestamp": datetime.now().isoformat()
     }
-    config_path = os.path.join(os.path.dirname(settings.FAISS_INDEX_PATH), "indexing_config.json")
+    config_filename = "indexing_config_2016_2018.json" if "2016_2018" in settings.FAISS_INDEX_PATH else "indexing_config.json"
+    config_path = os.path.join(os.path.dirname(settings.FAISS_INDEX_PATH), config_filename)
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config_meta, f, indent=2)
 
@@ -119,6 +120,6 @@ def build_indices(limit: int = 15000, batch_size: int = 256):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit", type=int, default=15000, help="Number of patents to index (default: 15000)")
+    parser.add_argument("--limit", type=int, default=0, help="Number of patents to index (0 for all 33,825 patents)")
     args = parser.parse_args()
     build_indices(limit=args.limit)

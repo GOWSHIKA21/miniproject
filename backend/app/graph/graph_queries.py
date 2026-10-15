@@ -173,6 +173,7 @@ class PatentGraphEngine:
         if not self.G or patent_id not in self.G:
             return []
 
+        import re
         neighbors = list(self.G.neighbors(patent_id))
         concept_neighbors = [n for n in neighbors if self.G.nodes[n].get("type") == "concept"]
 
@@ -180,7 +181,21 @@ class PatentGraphEngine:
         for c_id in concept_neighbors:
             for pred in self.G.predecessors(c_id):
                 if pred != patent_id:
-                    candidate_scores[pred] = candidate_scores.get(pred, 0) + 1
+                    candidate_scores[pred] = candidate_scores.get(pred, 0) + 2
+
+        # If candidates are fewer than requested limit, expand to patents in same technical field
+        if len(candidate_scores) < limit:
+            field_neighbors = [n for n in neighbors if self.G.nodes[n].get("type") == "field"]
+            target_title = self.G.nodes[patent_id].get("full_title", "").lower()
+            target_words = set(re.findall(r'\b[a-zA-Z]{4,}\b', target_title))
+
+            for f_id in field_neighbors:
+                for pred in list(self.G.predecessors(f_id))[:200]:
+                    if pred != patent_id and pred not in candidate_scores:
+                        pred_title = self.G.nodes.get(pred, {}).get("full_title", "").lower()
+                        pred_words = set(re.findall(r'\b[a-zA-Z]{4,}\b', pred_title))
+                        overlap = len(target_words.intersection(pred_words))
+                        candidate_scores[pred] = overlap + 1
 
         sorted_candidates = sorted(candidate_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
         

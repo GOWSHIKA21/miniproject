@@ -55,7 +55,7 @@ function App() {
               <Route path="/explorer" element={<Explorer isDarkTheme={isDarkTheme} />} />
               <Route path="/graph" element={<KnowledgeGraph isDarkTheme={isDarkTheme} />} />
               <Route path="/assistant" element={<AIAssistant isDarkTheme={isDarkTheme} />} />
-              <Route path="/patent/:id" element={<PatentDetails isDarkTheme={isDarkTheme} />} />
+              <Route path="/patent/*" element={<PatentDetails isDarkTheme={isDarkTheme} />} />
             </Routes>
           </main>
 
