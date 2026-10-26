@@ -1,0 +1,2 @@
+source_file,row_index,application_number,publication_number,raw_title,reasons
+application_details_granted_2021.csv,28365,3568/MUMNP/2015,52/2021,nan,['Missing or invalid TITLE_OF_INVENTION (raw: nan)']

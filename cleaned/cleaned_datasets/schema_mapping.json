@@ -1,0 +1,46 @@
+{
+  "APPLICATION_NUMBER": {
+    "target_field": "patent_id",
+    "transformation": "strip whitespace, preserve string formatting, validate uniqueness"
+  },
+  "PUBLICATION_NUMBER": {
+    "target_field": "publication_number",
+    "transformation": "strip whitespace, preserve journal issue format"
+  },
+  "PUBLICATION_DATE": {
+    "target_field": "publication_date",
+    "transformation": "parse DD/MM/YYYY into ISO 8601 YYYY-MM-DD"
+  },
+  "DATE_OF_FILING": {
+    "target_field": "filing_date",
+    "transformation": "parse DD/MM/YYYY into ISO 8601 YYYY-MM-DD"
+  },
+  "DATE_UPDATED_d_m_y": {
+    "target_field": "date_updated",
+    "transformation": "parse DD/MM/YYYY into ISO 8601 YYYY-MM-DD"
+  },
+  "TITLE_OF_INVENTION": {
+    "target_field": "title",
+    "transformation": "Unicode NFKC normalization, strip outer quotes and trailing punctuation, preserve scientific symbols, collapse whitespace"
+  },
+  "FIELD_OF_INVENTION": {
+    "target_field": "field_of_invention",
+    "transformation": "standardize uppercase, fill missing with 'UNCATEGORIZED', set field_imputed flag"
+  },
+  "IPO_LOCATION": {
+    "target_field": "ipo_location",
+    "transformation": "normalize to title case ('Delhi', 'Chennai', 'Kolkata', 'Mumbai'), derive ipo_code"
+  },
+  "APPLICATION_TYPE_DESC": {
+    "target_field": "application_type",
+    "transformation": "title-case description, derive high-level application_category"
+  },
+  "NO_OF_PAGES": {
+    "target_field": "no_of_pages",
+    "transformation": "cast to nullable Int64, generate field-median imputed variant"
+  },
+  "NO_OF_CLAIMS": {
+    "target_field": "no_of_claims",
+    "transformation": "cast to nullable Int64, generate field-median imputed variant and claims_range"
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "generated_timestamp": "2026-10-26T22:34:46.650917",
+  "total_nodes": 159678,
+  "node_breakdown": {
+    "Patent": 151438,
+    "Field": 16,
+    "Location": 4,
+    "ApplicationType": 9,
+    "Concept": 8211
+  },
+  "total_edges": 569774,
+  "edge_breakdown": {
+    "CLASSIFIED_IN": 151438,
+    "FILED_AT": 151438,
+    "TYPE_OF": 151438,
+    "RELATES_TO": 101834,
+    "CO_OCCURS_WITH": 13626
+  },
+  "integrity_validation": {
+    "dangling_or_orphaned_edges": 0,
+    "status": "PASSED"
+  },
+  "top_connected_concepts": [
+    {
+      "concept_name": "SYSTEMS METHODS",
+      "patent_count": 841
+    },
+    {
+      "concept_name": "INTERNAL COMBUSTION",
+      "patent_count": 575
+    },
+    {
+      "concept_name": "STEEL SHEET",
+      "patent_count": 524
+    },
+    {
+      "concept_name": "WIRELESS COMMUNICATION",
+      "patent_count": 496
+    },
+    {
+      "concept_name": "WIND TURBINE",
+      "patent_count": 404
+    },
+    {
+      "concept_name": "COMPOSITIONS METHODS",
+      "patent_count": 396
+    },
+    {
+      "concept_name": "METHODS SYSTEMS",
+      "patent_count": 394
+    },
+    {
+      "concept_name": "COMBUSTION ENGINE",
+      "patent_count": 348
+    },
+    {
+      "concept_name": "EXHAUST GAS",
+      "patent_count": 346
+    },
+    {
+      "concept_name": "BASE STATION",
+      "patent_count": 318
+    },
+    {
+      "concept_name": "POWER SUPPLY",
+      "patent_count": 287
+    },
+    {
+      "concept_name": "HIGH STRENGTH",
+      "patent_count": 256
+    },
+    {
+      "concept_name": "ORAL CARE",
+      "patent_count": 247
+    },
+    {
+      "concept_name": "LIGHT EMITTING",
+      "patent_count": 218
+    },
+    {
+      "concept_name": "HEAT EXCHANGER",
+      "patent_count": 215
+    },
+    {
+      "concept_name": "CIRCUIT BREAKER",
+      "patent_count": 205
+    },
+    {
+      "concept_name": "USER EQUIPMENT",
+      "patent_count": 202
+    },
+    {
+      "concept_name": "DATA TRANSMISSION",
+      "patent_count": 181
+    },
+    {
+      "concept_name": "MOTOR VEHICLE",
+      "patent_count": 181
+    },
+    {
+      "concept_name": "TYPE VEHICLE",
+      "patent_count": 173
+    }
+  ]
+}

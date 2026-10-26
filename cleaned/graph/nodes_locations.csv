@@ -1,0 +1,5 @@
+id:ID(Location-ID),city,office_code,patent_count,:LABEL
+LOC_DELHI,Delhi,DEL,57345,Location
+LOC_CHENNAI,Chennai,CHE,48987,Location
+LOC_KOLKATA,Kolkata,KOL,23368,Location
+LOC_MUMBAI,Mumbai,MUM,21738,Location

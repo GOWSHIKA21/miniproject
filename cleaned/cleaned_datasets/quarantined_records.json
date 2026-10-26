@@ -1,0 +1,12 @@
+[
+  {
+    "source_file": "application_details_granted_2021.csv",
+    "row_index": 28365,
+    "application_number": "3568/MUMNP/2015",
+    "publication_number": "52/2021",
+    "raw_title": "nan",
+    "reasons": [
+      "Missing or invalid TITLE_OF_INVENTION (raw: nan)"
+    ]
+  }
+]

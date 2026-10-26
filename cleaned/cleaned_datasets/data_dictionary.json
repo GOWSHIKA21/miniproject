@@ -1,0 +1,127 @@
+{
+  "patent_id": {
+    "type": "string",
+    "required": true,
+    "description": "Unique canonical patent application number issued by the Indian Patent Office (e.g., '10/DEL/2010', '1005/MUMNP/2007')."
+  },
+  "publication_number": {
+    "type": "string",
+    "required": false,
+    "description": "InPASS gazette journal publication issue identifier (e.g., '01/2016')."
+  },
+  "publication_date": {
+    "type": "string (ISO 8601 YYYY-MM-DD)",
+    "required": true,
+    "description": "Date on which the granted patent was published in the official patent journal."
+  },
+  "filing_date": {
+    "type": "string (ISO 8601 YYYY-MM-DD)",
+    "required": true,
+    "description": "Date of formal patent application filing with the Indian Patent Office."
+  },
+  "date_updated": {
+    "type": "string (ISO 8601 YYYY-MM-DD)",
+    "required": false,
+    "description": "Last database update timestamp recorded in InPASS."
+  },
+  "filing_year": {
+    "type": "integer",
+    "required": true,
+    "description": "Calendar year derived from filing_date."
+  },
+  "publication_year": {
+    "type": "integer",
+    "required": true,
+    "description": "Calendar year derived from publication_date."
+  },
+  "pendency_days": {
+    "type": "integer",
+    "required": false,
+    "description": "Elapsed duration in days between application filing and gazette publication (grant notification)."
+  },
+  "title": {
+    "type": "string",
+    "required": true,
+    "description": "Cleaned invention title with normalized Unicode, outer quotes stripped, and scientific symbols preserved."
+  },
+  "title_normalized": {
+    "type": "string",
+    "required": true,
+    "description": "Lowercase normalized title optimized for search tokenization and keyword matching."
+  },
+  "field_of_invention": {
+    "type": "string (categorical)",
+    "required": true,
+    "description": "Standardized technology classification assigned by IPO (e.g., CHEMISTRY, MECHANICAL, ELECTRONICS, or UNCATEGORIZED)."
+  },
+  "field_imputed": {
+    "type": "boolean",
+    "required": true,
+    "description": "Indicator flag specifying if field_of_invention was missing in source and assigned 'UNCATEGORIZED'."
+  },
+  "ipo_location": {
+    "type": "string (categorical)",
+    "required": true,
+    "description": "Indian Patent Office branch jurisdiction: Delhi, Chennai, Kolkata, or Mumbai."
+  },
+  "ipo_code": {
+    "type": "string (categorical)",
+    "required": true,
+    "description": "Standard 3-letter branch code abbreviation: DEL, CHE, KOL, or MUM."
+  },
+  "application_type": {
+    "type": "string (categorical)",
+    "required": true,
+    "description": "Title-cased official application procedure description (e.g. 'Pct National Phase Application')."
+  },
+  "application_category": {
+    "type": "string (categorical)",
+    "required": true,
+    "description": "High-level procedure category: 'PCT National Phase', 'Ordinary', 'Convention', 'Divisional', or 'Patent of Addition'."
+  },
+  "no_of_pages": {
+    "type": "integer (nullable)",
+    "required": false,
+    "description": "Exact number of pages in patent specification. Retains null if missing."
+  },
+  "no_of_claims": {
+    "type": "integer (nullable)",
+    "required": false,
+    "description": "Exact number of granted claims. Retains null if missing."
+  },
+  "no_of_pages_imputed": {
+    "type": "integer",
+    "required": true,
+    "description": "ML feature with missing page counts imputed using technology field median."
+  },
+  "no_of_claims_imputed": {
+    "type": "integer",
+    "required": true,
+    "description": "ML feature with missing claim counts imputed using technology field median."
+  },
+  "claims_range": {
+    "type": "string (categorical)",
+    "required": true,
+    "description": "Binned claim scope category: '1-5 claims', '6-15 claims', '16-30 claims', '30+ claims', or 'Unknown'."
+  },
+  "jurisdiction": {
+    "type": "string",
+    "required": true,
+    "description": "National patent jurisdiction constant ('India')."
+  },
+  "source_file": {
+    "type": "string",
+    "required": true,
+    "description": "Name of the raw InPASS CSV file from which the patent record originated."
+  },
+  "source_url": {
+    "type": "string",
+    "required": true,
+    "description": "Official verification URL for IPO public search portal."
+  },
+  "search_text": {
+    "type": "string",
+    "required": true,
+    "description": "Unified semantic representation combining title, field, jurisdiction, type, and timeline for hybrid retrieval."
+  }
+}

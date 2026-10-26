@@ -1,0 +1,23 @@
+{
+  "generated_timestamp": "2026-10-26T22:35:24.256750",
+  "total_documents": 151438,
+  "total_chunks": 454314,
+  "duplicate_chunks": 0,
+  "empty_chunks": 0,
+  "unique_chunk_ids": 454314,
+  "chunk_length_statistics": {
+    "average_words_per_chunk": 25.09,
+    "min_words": 12,
+    "max_words": 78
+  },
+  "section_breakdown": {
+    "invention_overview": 151438,
+    "procedural_history": 151438,
+    "scope_and_claims": 151438
+  },
+  "file_artifacts": {
+    "documents_jsonl": "C:\\Users\\gowsh\\OneDrive\\Desktop\\RAG\\miniproject\\cleaned\\rag\\rag_documents.jsonl",
+    "chunks_jsonl": "C:\\Users\\gowsh\\OneDrive\\Desktop\\RAG\\miniproject\\cleaned\\rag\\rag_chunks.jsonl",
+    "chunks_parquet": "C:\\Users\\gowsh\\OneDrive\\Desktop\\RAG\\miniproject\\cleaned\\rag\\rag_chunks.parquet"
+  }
+}

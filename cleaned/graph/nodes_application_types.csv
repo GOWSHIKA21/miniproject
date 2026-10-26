@@ -1,0 +1,10 @@
+id:ID(Type-ID),type_name,category,patent_count,:LABEL
+TYPE_PCT_NATIONAL_PHASE_APPLICATION,Pct National Phase Application,PCT National Phase,102586,ApplicationType
+TYPE_ORDINARY_APPLICATION,Ordinary Application,Ordinary,30848,ApplicationType
+TYPE_CONVENTION_APPLICATION,Convention Application,Convention,15493,ApplicationType
+TYPE_DIVISIONAL_PCT_NATIONAL_PHASE_APPLICATION,Divisional Pct National Phase Application,Divisional,2053,ApplicationType
+TYPE_PATENT_OF_ADDITION_FOR_ORDINARY_APPLICATION,Patent Of Addition For Ordinary Application,Patent of Addition,179,ApplicationType
+TYPE_DIVISIONAL_CONVENTION_APPLICATION,Divisional Convention Application,Divisional,130,ApplicationType
+TYPE_DIVISIONAL_ORDINARY_APPLICATION,Divisional Ordinary Application,Divisional,127,ApplicationType
+TYPE_PATENT_OF_ADDITION_FOR_PCT_NATIONAL_PHASE_APPLICATION,Patent Of Addition For Pct National Phase Application,Patent of Addition,18,ApplicationType
+TYPE_PATENT_OF_ADDITION_FOR_CONVENTION_APPLICATION,Patent Of Addition For Convention Application,Patent of Addition,4,ApplicationType
