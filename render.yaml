@@ -4,8 +4,13 @@ services:
     runtime: python
     region: singapore
     plan: free
-    # Install CPU-only PyTorch first (smaller, no CUDA needed), then the rest
+    # Step 1: Refresh Ubuntu CA bundle (fixes ISRG Root X1 / Let's Encrypt trust on Ubuntu 20.04)
+    # Step 2: Install CPU-only PyTorch (avoids downloading 2GB CUDA variant)
+    # Step 3: Install all remaining dependencies (certifi and dnspython now explicit)
     buildCommand: >
+      apt-get update -qq &&
+      apt-get install -y --no-install-recommends ca-certificates &&
+      update-ca-certificates &&
       pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu &&
       pip install --no-cache-dir -r backend/requirements.txt
     startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"

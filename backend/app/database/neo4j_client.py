@@ -9,8 +9,9 @@ from typing import Optional, Dict, Any, List
 from urllib.parse import urlparse
 import certifi
 
-# Configure CA bundle for verified TLS with Neo4j Aura
-os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+# NOTE: We do NOT set SSL_CERT_FILE as a process-wide env var here.
+# That would affect all TLS connections in the process (including PyMongo).
+# Instead, certifi is used in scoped ssl.create_default_context() calls only.
 
 from neo4j import GraphDatabase, Driver
 from backend.app.config import settings

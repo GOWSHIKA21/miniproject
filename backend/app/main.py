@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.core.config import settings
 from backend.app.api.health import router as health_router
-from backend.app.api.routes import search, chat, patents, graph, stats
+from backend.app.api.routes import search, chat, patents, graph, stats, diagnostics
 from backend.app.schemas.chat import ChatRequest, ChatResponse
 from backend.app.services.rag_service import rag_service
 from backend.app.database.mongodb import mongo_client
@@ -50,6 +50,7 @@ app.include_router(chat.router, prefix="/api")
 app.include_router(patents.router, prefix="/api")
 app.include_router(graph.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
+app.include_router(diagnostics.router, prefix="/api")
 
 # Direct alias for /api/ask to support both /api/ask and /api/chat/ask
 @app.post("/api/ask", response_model=ChatResponse, tags=["RAG Chat"])

@@ -1,7 +1,9 @@
 import os
 import re
+import ssl
 import logging
 from typing import List, Dict, Any, Optional, Tuple
+import certifi
 import pandas as pd
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
@@ -32,16 +34,37 @@ class MongoDBClient:
         self._init_connection()
 
     def _init_connection(self):
+        import sys
+        import pymongo as _pymongo
+        _ca_bundle = certifi.where()
+        logger.info(
+            f"[MongoDB] Connecting to Atlas | "
+            f"Python={sys.version.split()[0]} "
+            f"OpenSSL={ssl.OPENSSL_VERSION} "
+            f"PyMongo={_pymongo.__version__} "
+            f"certifi={certifi.__version__} "
+            f"tlsCAFile={_ca_bundle}"
+        )
         try:
-            self.client = MongoClient(self.uri, serverSelectionTimeoutMS=2500)
+            self.client = MongoClient(
+                self.uri,
+                serverSelectionTimeoutMS=5000,
+                connectTimeoutMS=10000,
+                socketTimeoutMS=20000,
+                tlsCAFile=_ca_bundle,
+            )
             # Force server check
             self.client.admin.command('ping')
             self.db = self.client[self.db_name]
             self.connected = True
-            logger.info(f"Connected successfully to MongoDB at {mask_uri(self.uri)}, database '{self.db_name}', collection '{self.collection_name}'")
+            logger.info(f"[MongoDB] Connected successfully to {mask_uri(self.uri)}, database '{self.db_name}', collection '{self.collection_name}'")
             self._ensure_indexes()
         except (ConnectionFailure, ServerSelectionTimeoutError, Exception) as e:
-            logger.warning(f"MongoDB connection failed at {mask_uri(self.uri)} ({e}). Operating in memory/Parquet fallback mode.")
+            logger.warning(
+                f"[MongoDB] Connection failed at {mask_uri(self.uri)} "
+                f"({type(e).__name__}: {e}). "
+                f"Operating in Parquet fallback mode."
+            )
             self.connected = False
             self.client = None
             self.db = None
