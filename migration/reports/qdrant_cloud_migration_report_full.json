@@ -1,0 +1,14 @@
+{
+  "mode": "full",
+  "target_url": "https://f926cdb3-3b12-47ea-9d60-e29fb6b159ff.ca-central-1-0.aws.cloud.qdrant.io",
+  "collection": "patent_embeddings",
+  "source_type": "faiss",
+  "dimension": 384,
+  "distance": "Cosine",
+  "start_time": "2026-10-27T15:51:58.016521+00:00",
+  "end_time": "2026-10-27T15:52:31.557720+00:00",
+  "duration_seconds": 33.54,
+  "total_points_prepared": 2000,
+  "total_points_upserted": 2000,
+  "errors": []
+}

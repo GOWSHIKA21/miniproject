@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ALL_TECHNOLOGIES, patents } from '../data/patents';
+import { ALL_TECHNOLOGIES } from '../data/patents';
 import { api } from '../services/api';
 import { Cpu, Search, ArrowUpRight, Layers, Sparkles } from 'lucide-react';
 
@@ -19,16 +19,17 @@ export default function Explorer({ isDarkTheme }) {
     loadStats();
   }, []);
 
+  // Show only domains genuinely represented in the dataset with valid matching patents (> 0)
   const techStats = ALL_TECHNOLOGIES.map(tech => {
     const upperTech = tech.toUpperCase();
     const realCount = backendStats?.field_counts?.[upperTech];
 
     return {
       name: tech,
-      count: realCount !== undefined ? realCount : (backendStats ? 0 : 12),
-      isReal: realCount !== undefined
+      count: realCount !== undefined ? realCount : 0,
+      isReal: realCount !== undefined && realCount > 0
     };
-  });
+  }).filter(t => !backendStats || t.count > 0);
 
   const filteredTechnologies = techStats.filter(t => 
     t.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -54,17 +55,17 @@ export default function Explorer({ isDarkTheme }) {
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold mb-2">
-            Explore 36+ Technology Domains
+            Explore {filteredTechnologies.length} Official Technology Domains
           </h1>
           <p className={`text-xs sm:text-sm max-w-2xl ${isDarkTheme ? 'text-slate-400' : 'text-[#5a478c]'}`}>
-            Browse patent volume velocity, monitor emerging research trends, and filter searches by technology field.
+            Browse verified Indian Patent Office technology fields with matching granted records and filter searches directly.
           </p>
 
           <div className="mt-6 relative max-w-lg">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6b46c1]" />
             <input
               type="text"
-              placeholder="Search technology domain e.g. Quantum Computing, AI, Robotics..."
+              placeholder="Filter domains e.g. Chemistry, Computer, Electronics, Biotechnology..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className={`w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#6b46c1] border ${
@@ -79,7 +80,7 @@ export default function Explorer({ isDarkTheme }) {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold flex items-center gap-2">
               <Layers className="w-4 h-4 text-[#6b46c1]" />
-              Technology Domains ({filteredTechnologies.length})
+              Available Domains ({filteredTechnologies.length})
             </h2>
           </div>
 
@@ -103,8 +104,8 @@ export default function Explorer({ isDarkTheme }) {
                   </div>
 
                   <div className="flex items-baseline gap-1.5 mb-3">
-                    <span className="text-xl font-extrabold text-[#6b46c1]">{tech.count}</span>
-                    <span className="text-[11px] text-slate-400">active patents</span>
+                    <span className="text-xl font-extrabold text-[#6b46c1]">{tech.count.toLocaleString()}</span>
+                    <span className="text-[11px] text-slate-400">verified patents</span>
                   </div>
                 </div>
 

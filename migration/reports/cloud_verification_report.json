@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-10-27T15:11:29Z",
+  "mongodb_atlas": {
+    "uri": "mongodb+srv:****@cluster0.s8wie4s.mongodb.net/",
+    "database": "patentgraph_db",
+    "collection": "patents",
+    "connected": false,
+    "total_documents": 0,
+    "status": "OFFLINE_FALLBACK"
+  },
+  "neo4j_aura": {
+    "uri": "neo4j+s://f53f0d18.databases.neo4j.io",
+    "database": "f53f0d18",
+    "connected": true,
+    "latency_ms": 635.18,
+    "total_nodes": 8290,
+    "total_relationships": 280,
+    "sample_labels": [
+      {
+        "lbl": [
+          "Field"
+        ],
+        "cnt": 16
+      },
+      {
+        "lbl": [
+          "Location"
+        ],
+        "cnt": 4
+      },
+      {
+        "lbl": [
+          "ApplicationType"
+        ],
+        "cnt": 9
+      },
+      {
+        "lbl": [
+          "Concept"
+        ],
+        "cnt": 8211
+      },
+      {
+        "lbl": [
+          "Patent"
+        ],
+        "cnt": 50
+      }
+    ],
+    "status": "PASS"
+  },
+  "qdrant_cloud": {
+    "url": "https://f926cdb3-3b12-47ea-9d60-e29fb6b159ff.ca-central-1-0.aws.cloud.qdrant.io",
+    "collection": "patent_embeddings",
+    "connected": true,
+    "latency_ms": 314.91,
+    "total_vectors": 0,
+    "dimension": 384,
+    "status": "PASS"
+  },
+  "overall_cloud_ready": true
+}

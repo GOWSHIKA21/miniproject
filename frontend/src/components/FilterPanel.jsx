@@ -122,16 +122,24 @@ export default function FilterPanel({ filters, setFilters, onReset, onApply, isD
         {/* CONDITIONALLY RENDERED DATE PICKERS BASED ON SELECTION */}
         {filters.dateType === 'Priority' && (
           <div className="space-y-1 animate-fade-in pt-1">
-            <span className="text-[11px] font-bold text-[#6b46c1]">Priority Date</span>
+            <span className="text-[11px] font-bold text-[#6b46c1]">Priority Year (2016 – 2023)</span>
             <div className="relative">
-              <input
-                type="date"
+              <select
                 value={filters.priorityDate || ''}
-                onChange={(e) => setFilters({ ...filters, priorityDate: e.target.value })}
-                className={`w-full rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-[#6b46c1] border ${
-                  isDarkTheme ? 'bg-[#231845] border-[#382969] text-white' : 'bg-slate-50 border-[#e2d5f8] text-[#2d1f56]'
+                onChange={(e) => setFilters(prev => ({ ...prev, priorityDate: e.target.value }))}
+                className={`w-full rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#6b46c1] border cursor-pointer ${
+                  isDarkTheme
+                    ? 'bg-[#231845] border-[#382969] text-white'
+                    : 'bg-slate-50 border-[#e2d5f8] text-[#2d1f56]'
                 }`}
-              />
+              >
+                <option value="">Select Priority Year</option>
+                {[2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023].map((yr) => (
+                  <option key={yr} value={String(yr)}>
+                    {yr}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         )}

@@ -1,0 +1,23 @@
+{
+  "source_file": "C:\\Users\\gowsh\\OneDrive\\Desktop\\RAG\\miniproject\\cleaned\\cleaned_datasets\\cleaned_patents_consolidated.parquet",
+  "source_sha256": "e79bfdd564c73fecfb84f5f1bf0454e9c390dfd105b9430e69f81ebc9dd27456",
+  "source_total_records": 151438,
+  "processed_records": 151438,
+  "upserted_records": 0,
+  "modified_records": 0,
+  "matched_records": 0,
+  "skipped_records": 0,
+  "failed_records": 0,
+  "quarantined": [],
+  "errors": [],
+  "start_time": "2026-10-27T04:53:49.362809+00:00",
+  "end_time": "2026-10-27T04:53:55.313976+00:00",
+  "duration_seconds": 5.95,
+  "mode": "dry-run",
+  "database": "patentgraph_db",
+  "collection": "patents",
+  "masked_uri": "mongodb://localhost:27017",
+  "indexes_created": [],
+  "initial_destination_count": 0,
+  "final_destination_count": 0
+}

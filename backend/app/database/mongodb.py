@@ -9,15 +9,22 @@ from backend.app.config import settings
 
 logger = logging.getLogger(__name__)
 
+def mask_uri(uri: str) -> str:
+    """Mask credentials in MongoDB connection URI for safe logging and inspection."""
+    if not uri:
+        return "[EMPTY]"
+    return re.sub(r":([^@]+)@", ":****@", uri)
+
+
 class MongoDBClient:
     def __init__(
         self,
         uri: str = settings.MONGODB_URI,
-        db_name: str = settings.MONGODB_DB_NAME,
+        db_name: Optional[str] = None,
         collection_name: str = settings.MONGODB_COLLECTION
     ):
         self.uri = uri
-        self.db_name = db_name
+        self.db_name = db_name or getattr(settings, "MONGODB_DATABASE", None) or settings.MONGODB_DB_NAME
         self.collection_name = collection_name
         self.client: Optional[MongoClient] = None
         self.db = None
@@ -31,10 +38,10 @@ class MongoDBClient:
             self.client.admin.command('ping')
             self.db = self.client[self.db_name]
             self.connected = True
-            logger.info(f"Connected successfully to MongoDB at {self.uri}, database '{self.db_name}', collection '{self.collection_name}'")
+            logger.info(f"Connected successfully to MongoDB at {mask_uri(self.uri)}, database '{self.db_name}', collection '{self.collection_name}'")
             self._ensure_indexes()
         except (ConnectionFailure, ServerSelectionTimeoutError, Exception) as e:
-            logger.warning(f"MongoDB connection failed at {self.uri} ({e}). Operating in memory/Parquet fallback mode.")
+            logger.warning(f"MongoDB connection failed at {mask_uri(self.uri)} ({e}). Operating in memory/Parquet fallback mode.")
             self.connected = False
             self.client = None
             self.db = None
@@ -44,14 +51,22 @@ class MongoDBClient:
             return
         try:
             coll = self.db[self.collection_name]
-            coll.create_index([("patent_id", ASCENDING)], unique=True)
-            coll.create_index([("field_of_invention", ASCENDING)])
-            coll.create_index([("ipo_location", ASCENDING)])
-            coll.create_index([("filing_date", ASCENDING)])
-            coll.create_index([("publication_date", ASCENDING)])
+            existing_indexes = list(coll.list_indexes())
+            existing_keys = [tuple(idx["key"].items()) for idx in existing_indexes]
+
+            desired = [
+                ([("patent_id", ASCENDING)], {"unique": True, "name": "idx_patent_id_unique"}),
+                ([("field_of_invention", ASCENDING)], {"name": "idx_field_of_invention"}),
+                ([("ipo_location", ASCENDING)], {"name": "idx_ipo_location"}),
+                ([("filing_date", ASCENDING)], {"name": "idx_filing_date"}),
+                ([("publication_date", ASCENDING)], {"name": "idx_publication_date"}),
+            ]
+            for keys, kwargs in desired:
+                if tuple(keys) not in existing_keys:
+                    coll.create_index(keys, **kwargs)
             logger.info(f"MongoDB indexes verified on collection '{self.collection_name}'")
         except Exception as e:
-            logger.error(f"Error ensuring indexes on '{self.collection_name}': {e}")
+            logger.debug(f"Index verification note on '{self.collection_name}': {e}")
 
     def insert_patents_from_parquet(
         self,
@@ -115,11 +130,11 @@ class MongoDBClient:
         conditions = []
 
         if filters:
-            # 1. Technology Domain
+            # 1. Technology Domain (exact domain match to prevent 'Chemistry' matching 'Biochemistry')
             techs = filters.get("fields_of_invention") or ([filters.get("field_of_invention")] if filters.get("field_of_invention") else [])
             techs = [t for t in techs if t and str(t).upper() != "ALL"]
             if techs:
-                regex_pattern = "^(" + "|".join(re.escape(str(t).strip()) for t in techs) + ")"
+                regex_pattern = "^(" + "|".join(re.escape(str(t).strip()) for t in techs) + ")$"
                 conditions.append({"field_of_invention": {"$regex": regex_pattern, "$options": "i"}})
 
             # 2. Patent Office
@@ -132,46 +147,44 @@ class MongoDBClient:
             if app_type and str(app_type).upper() not in ("ALL", ""):
                 conditions.append({"application_type": {"$regex": re.escape(str(app_type).strip()), "$options": "i"}})
 
-            # 4. Inventor Filter
+            # 4. Inventor Filter (Whole-word matching to prevent 'tata' matching 'rotatable')
             inv = filters.get("inventor")
             if inv and str(inv).strip():
                 inv_clean = str(inv).strip()
-                is_default_inv = any(tok in "government of india ipo record" for tok in inv_clean.lower().split())
-                inv_conds = [
-                    {"inventor": {"$regex": re.escape(inv_clean), "$options": "i"}},
-                    {"applicant": {"$regex": re.escape(inv_clean), "$options": "i"}},
-                    {"inventors": {"$elemMatch": {"$regex": re.escape(inv_clean), "$options": "i"}}},
-                    {"applicants": {"$elemMatch": {"$regex": re.escape(inv_clean), "$options": "i"}}},
-                    {"search_text": {"$regex": re.escape(inv_clean), "$options": "i"}},
-                    {"title": {"$regex": re.escape(inv_clean), "$options": "i"}}
-                ]
-                if is_default_inv:
-                    inv_conds.append({"inventor": {"$exists": False}})
-                    inv_conds.append({"inventor": None})
-                conditions.append({"$or": inv_conds})
+                is_default_inv = any(tok in "government of india ipo record" for tok in inv_clean.lower().split() if len(tok) >= 3)
+                if not is_default_inv:
+                    word_rx = rf"\b{re.escape(inv_clean)}\b"
+                    inv_conds = [
+                        {"inventor": {"$regex": word_rx, "$options": "i"}},
+                        {"applicant": {"$regex": word_rx, "$options": "i"}},
+                        {"inventors": {"$elemMatch": {"$regex": word_rx, "$options": "i"}}},
+                        {"applicants": {"$elemMatch": {"$regex": word_rx, "$options": "i"}}},
+                        {"search_text": {"$regex": word_rx, "$options": "i"}},
+                        {"title": {"$regex": word_rx, "$options": "i"}}
+                    ]
+                    conditions.append({"$or": inv_conds})
 
-            # 5. Organisation / Applicant Filter
+            # 5. Organisation / Applicant Filter (Whole-word matching across org, loc, search_text, title)
             org = filters.get("organization")
             if org and str(org).strip():
                 org_clean = str(org).strip()
-                is_default_org = any(tok in org_clean.lower() for tok in ["indian", "patent", "office", "ipo"])
-                org_conds = [
-                    {"organization": {"$regex": re.escape(org_clean), "$options": "i"}},
-                    {"organisation": {"$regex": re.escape(org_clean), "$options": "i"}},
-                    {"applicant": {"$regex": re.escape(org_clean), "$options": "i"}},
-                    {"assignee": {"$regex": re.escape(org_clean), "$options": "i"}},
-                    {"applicants": {"$elemMatch": {"$regex": re.escape(org_clean), "$options": "i"}}},
-                    {"assignees": {"$elemMatch": {"$regex": re.escape(org_clean), "$options": "i"}}},
-                    {"ipo_location": {"$regex": re.escape(org_clean), "$options": "i"}},
-                    {"search_text": {"$regex": re.escape(org_clean), "$options": "i"}},
-                    {"title": {"$regex": re.escape(org_clean), "$options": "i"}}
-                ]
-                if is_default_org:
-                    org_conds.append({"organization": {"$exists": False}})
-                    org_conds.append({"organization": None})
-                conditions.append({"$or": org_conds})
+                is_default_org = any(tok in org_clean.lower() for tok in ["indian patent office", "patent office", "ipo record"])
+                if not is_default_org:
+                    word_rx = rf"\b{re.escape(org_clean)}\b"
+                    org_conds = [
+                        {"organization": {"$regex": word_rx, "$options": "i"}},
+                        {"organisation": {"$regex": word_rx, "$options": "i"}},
+                        {"applicant": {"$regex": word_rx, "$options": "i"}},
+                        {"assignee": {"$regex": word_rx, "$options": "i"}},
+                        {"applicants": {"$elemMatch": {"$regex": word_rx, "$options": "i"}}},
+                        {"assignees": {"$elemMatch": {"$regex": word_rx, "$options": "i"}}},
+                        {"ipo_location": {"$regex": word_rx, "$options": "i"}},
+                        {"search_text": {"$regex": word_rx, "$options": "i"}},
+                        {"title": {"$regex": word_rx, "$options": "i"}}
+                    ]
+                    conditions.append({"$or": org_conds})
 
-            # 6. Date Filter
+            # 6. Date Filter & Priority Date (Year Only or Exact Date)
             exact_date = filters.get("exact_date")
             priority_date = filters.get("priority_date")
             date_from = filters.get("date_from")
@@ -179,14 +192,27 @@ class MongoDBClient:
 
             if exact_date:
                 conditions.append({"$or": [
-                    {"publication_date": exact_date},
-                    {"filing_date": exact_date}
+                    {"publication_date": str(exact_date)},
+                    {"filing_date": str(exact_date)}
                 ]})
             elif priority_date:
-                conditions.append({"$or": [
-                    {"filing_date": priority_date},
-                    {"publication_date": priority_date}
-                ]})
+                pyear = str(priority_date).strip()
+                if re.match(r"^\d{4}$", pyear):
+                    year_int = int(pyear)
+                    conditions.append({"$or": [
+                        {"priority_date": {"$regex": f"^{pyear}"}},
+                        {"priority_year": year_int},
+                        {"publication_date": {"$regex": f"^{pyear}"}},
+                        {"filing_date": {"$regex": f"^{pyear}"}},
+                        {"publication_year": year_int},
+                        {"filing_year": year_int}
+                    ]})
+                else:
+                    conditions.append({"$or": [
+                        {"priority_date": priority_date},
+                        {"filing_date": priority_date},
+                        {"publication_date": priority_date}
+                    ]})
             else:
                 if date_from and date_to:
                     conditions.append({"$or": [
@@ -214,7 +240,7 @@ class MongoDBClient:
             q_clean = query_text.strip()
             tokens = [re.escape(tok) for tok in q_clean.split() if len(tok) > 1]
             if tokens:
-                title_regex = "|".join(tokens)
+                title_regex = "|".join(rf"\b{tok}\b" for tok in tokens)
                 conditions.append({"$or": [
                     {"patent_id": {"$regex": re.escape(q_clean), "$options": "i"}},
                     {"title": {"$regex": title_regex, "$options": "i"}},
@@ -276,7 +302,7 @@ class MongoDBClient:
                     "status": "connected",
                     "database": self.db_name,
                     "collection": self.collection_name,
-                    "uri": self.uri
+                    "uri": mask_uri(self.uri)
                 }
             except Exception as e:
                 logger.error(f"MongoDB get_stats error: {e}")

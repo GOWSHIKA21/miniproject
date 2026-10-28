@@ -1,0 +1,66 @@
+{
+  "timestamp": "2026-10-27T05:14:19Z",
+  "masked_uri": "mongodb+srv:****@cluster0.s8wie4s.mongodb.net/",
+  "database": "patentgraph_db",
+  "collection": "patents",
+  "connected": true,
+  "ping_latency_ms": 1619.27,
+  "total_documents": 100,
+  "duplicate_patent_ids": 0,
+  "storage_stats": {
+    "count": 100,
+    "size_mb": 0.1,
+    "storage_size_mb": 0.04,
+    "total_index_size_mb": 0.14,
+    "avg_obj_size_bytes": 1098
+  },
+  "indexes": [
+    "_id_",
+    "idx_patent_id_unique",
+    "idx_field_of_invention",
+    "idx_ipo_location",
+    "idx_filing_date",
+    "idx_publication_date",
+    "idx_application_type"
+  ],
+  "sample_record_verified": true,
+  "query_tests": [
+    {
+      "name": "Exact Lookup by Patent ID",
+      "filter": "{'patent_id': '10/DEL/2010'}",
+      "results_count": 1,
+      "duration_ms": 111.49,
+      "passed": true
+    },
+    {
+      "name": "Filter by Technology Domain (CHEMISTRY)",
+      "filter": "{'field_of_invention': {'$regex': '^CHEMISTRY', '$options': 'i'}}",
+      "results_count": 10,
+      "duration_ms": 80.51,
+      "passed": true
+    },
+    {
+      "name": "Filter by IPO Jurisdiction (Delhi)",
+      "filter": "{'ipo_location': {'$regex': '^Delhi', '$options': 'i'}}",
+      "results_count": 10,
+      "duration_ms": 56.18,
+      "passed": true
+    },
+    {
+      "name": "Date Range Query (filing >= 2018)",
+      "filter": "{'filing_date': {'$gte': '2018-01-01'}}",
+      "results_count": 0,
+      "duration_ms": 41.58,
+      "passed": false
+    },
+    {
+      "name": "Composite Faceted Search (MECHANICAL + Chennai)",
+      "filter": "{'$and': [{'field_of_invention': {'$regex': '^MECHANICAL', '$options': 'i'}}, {'ipo_location': {'$regex': '^Chennai', '$options': 'i'}}]}",
+      "results_count": 0,
+      "duration_ms": 50.14,
+      "passed": true
+    }
+  ],
+  "all_tests_passed": false,
+  "sample_patent_id": "10/DEL/2010"
+}

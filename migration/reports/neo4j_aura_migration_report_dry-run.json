@@ -1,0 +1,24 @@
+{
+  "mode": "dry-run",
+  "target_uri": "neo4j+s://f53f0d18.databases.neo4j.io",
+  "target_database": "neo4j",
+  "start_time": "2026-10-27T13:23:50.322944+00:00",
+  "end_time": "2026-10-27T13:23:55.673577+00:00",
+  "duration_seconds": 5.35,
+  "nodes_ingested": {
+    "Field": 16,
+    "Location": 4,
+    "ApplicationType": 9,
+    "Concept": 8211,
+    "Patent": 151438
+  },
+  "relationships_ingested": {
+    "CLASSIFIED_IN": 151438,
+    "FILED_AT": 151438,
+    "TYPE_OF": 151438,
+    "RELATES_TO": 101834,
+    "CO_OCCURS_WITH": 13626
+  },
+  "constraints_created": [],
+  "errors": []
+}

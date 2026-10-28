@@ -2,7 +2,8 @@ import os
 from fastapi import APIRouter
 from backend.app.core.config import settings
 from backend.app.database.mongodb import mongo_client
-from backend.app.database.neo4j_client import neo4j_client
+from backend.app.database.neo4j_client import neo4j_client, mask_neo4j_uri
+from backend.app.database.qdrant_client import qdrant_client
 from backend.app.retrieval.vector_search import faiss_retriever
 from backend.app.retrieval.keyword_search import bm25_retriever
 from backend.app.graph.graph_queries import graph_engine
@@ -14,6 +15,8 @@ router = APIRouter(tags=["Health"])
 def get_health_status():
     """Health check endpoint to verify backend service readiness and database connectivity."""
     mongo_status = mongo_client.get_stats()
+    qdrant_status = qdrant_client.get_stats()
+    neo4j_status = neo4j_client.get_stats()
     
     faiss_ready = faiss_retriever.index is not None
     faiss_count = faiss_retriever.index.ntotal if faiss_ready else 0
@@ -25,8 +28,10 @@ def get_health_status():
     graph_nodes = graph_engine.G.number_of_nodes() if graph_ready else 0
     graph_edges = graph_engine.G.number_of_edges() if graph_ready else 0
 
+    vector_ready = qdrant_client.connected or faiss_ready
+
     return {
-        "status": "healthy" if (mongo_client.connected and faiss_ready and bm25_ready) else "degraded",
+        "status": "healthy" if (mongo_client.connected and vector_ready and bm25_ready) else "degraded",
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
@@ -35,24 +40,34 @@ def get_health_status():
             "dataset_path": settings.CLEANED_DATA_PATH
         },
         "components": {
-            "mongodb": {
+            "mongodb_atlas": {
                 "connected": mongo_client.connected,
                 "database": mongo_client.db_name,
                 "collection": mongo_client.collection_name,
                 "total_documents": mongo_status.get("total_patents", 0)
             },
-            "neo4j": {
+            "neo4j_aura": {
                 "connected": neo4j_client.connected,
-                "uri": settings.NEO4J_URI,
-                "active_engine": "Neo4j Server" if neo4j_client.connected else "Embedded NetworkX MultiDiGraph (Offline Fallback)"
+                "uri": mask_neo4j_uri(neo4j_client.uri),
+                "database": neo4j_client.database,
+                "active_engine": "Neo4j Aura Cloud" if neo4j_client.connected else "Embedded NetworkX MultiDiGraph (Offline Fallback)",
+                "total_nodes": neo4j_status.get("total_nodes", 0) if neo4j_client.connected else graph_nodes,
+                "total_relationships": neo4j_status.get("total_relationships", 0) if neo4j_client.connected else graph_edges
             },
-            "knowledge_graph": {
+            "qdrant_cloud": {
+                "connected": qdrant_client.connected,
+                "url": qdrant_status.get("url"),
+                "collection": qdrant_status.get("collection"),
+                "active_engine": "Qdrant Cloud Vector Database" if qdrant_client.connected else "Local FAISS IndexFlatIP (Offline Fallback)",
+                "total_vectors": qdrant_status.get("total_vectors", 0) if qdrant_client.connected else faiss_count
+            },
+            "knowledge_graph_fallback": {
                 "loaded": graph_ready,
                 "nodes": graph_nodes,
                 "edges": graph_edges,
                 "file": settings.GRAPH_STORE_PATH
             },
-            "faiss_vector_index": {
+            "faiss_vector_index_fallback": {
                 "ready": faiss_ready,
                 "total_vectors": faiss_count,
                 "dimension": settings.EMBEDDING_DIM,

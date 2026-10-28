@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _backend_dir = Path(__file__).resolve().parent.parent.parent
@@ -10,6 +11,19 @@ _env_paths = [
     ".env",
     "backend/.env"
 ]
+
+def _resolve_data_path(rel_subpath: str) -> str:
+    """Safely resolve data file paths regardless of the current working directory."""
+    if os.path.exists(rel_subpath):
+        return os.path.abspath(rel_subpath)
+    candidate_app = str((_backend_dir / "app" / "data" / Path(rel_subpath).name).resolve())
+    if os.path.exists(candidate_app):
+        return candidate_app
+    clean_sub = rel_subpath.replace("backend/", "").replace("backend\\", "")
+    candidate_backend = str((_backend_dir / clean_sub).resolve())
+    if os.path.exists(candidate_backend):
+        return candidate_backend
+    return rel_subpath
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_env_paths, extra="allow")
@@ -28,22 +42,32 @@ class Settings(BaseSettings):
 
     # Database & Storage
     MONGODB_URI: str = "mongodb://localhost:27017"
+    MONGODB_DATABASE: str = "patentgraph_db"
     MONGODB_DB_NAME: str = "patentgraph_db"
     MONGODB_COLLECTION: str = "patents"
 
+    # Neo4j Graph Database (Local or Neo4j Aura)
     NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USERNAME: str = "neo4j"
     NEO4J_USER: str = "neo4j"
     NEO4J_PASSWORD: str = "password"
+    NEO4J_DATABASE: str = "neo4j"
+
+    # Qdrant Cloud Vector Database
+    QDRANT_URL: Optional[str] = None
+    QDRANT_API_KEY: Optional[str] = None
+    QDRANT_COLLECTION: str = "patent_embeddings"
+    QDRANT_TIMEOUT: float = 10.0
 
     # Embedding and Paths
     EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
     EMBEDDING_DIM: int = 384
-    DATA_DIR: str = "backend/app/data"
-    CLEANED_DATA_PATH: str = "backend/app/data/cleaned_patents.parquet"
-    FAISS_INDEX_PATH: str = "backend/app/data/faiss_index.bin"
-    FAISS_ID_MAP_PATH: str = "backend/app/data/faiss_id_map.json"
-    BM25_INDEX_PATH: str = "backend/app/data/bm25_index.pkl"
-    GRAPH_STORE_PATH: str = "backend/app/data/knowledge_graph.pkl"
+    DATA_DIR: str = _resolve_data_path("backend/app/data")
+    CLEANED_DATA_PATH: str = _resolve_data_path("backend/app/data/cleaned_patents.parquet")
+    FAISS_INDEX_PATH: str = _resolve_data_path("backend/app/data/faiss_index.bin")
+    FAISS_ID_MAP_PATH: str = _resolve_data_path("backend/app/data/faiss_id_map.json")
+    BM25_INDEX_PATH: str = _resolve_data_path("backend/app/data/bm25_index.pkl")
+    GRAPH_STORE_PATH: str = _resolve_data_path("backend/app/data/knowledge_graph.pkl")
 
     # Groq LLM Settings
     LLM_PROVIDER: str = "groq"
@@ -51,8 +75,17 @@ class Settings(BaseSettings):
     GROQ_MODEL: str = "qwen/qwen3.8-27b"
 
     # RAG Settings
-    RAG_TOP_K: int = 5
+    RAG_TOP_K: int = 10
     RAG_SIMILARITY_THRESHOLD: float = 0.25
-    RAG_MAX_CONTEXT_TOKENS: int = 2000
+    RAG_MAX_CONTEXT_TOKENS: int = 3000
+    RAG_ENABLE_DEBUG_LOGGING: bool = False
+
+    @model_validator(mode="after")
+    def resolve_path_fields(self):
+        for field in ["DATA_DIR", "CLEANED_DATA_PATH", "FAISS_INDEX_PATH", "FAISS_ID_MAP_PATH", "BM25_INDEX_PATH", "GRAPH_STORE_PATH"]:
+            val = getattr(self, field, None)
+            if val and isinstance(val, str):
+                setattr(self, field, _resolve_data_path(val))
+        return self
 
 settings = Settings()

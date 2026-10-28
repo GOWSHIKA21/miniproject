@@ -1,6 +1,16 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.env
+backend/.env
 
+# Large generated RAG datasets
 cleaned/rag/rag_chunks.jsonl
 cleaned/rag/rag_documents.jsonl
 
-cleaned/rag/rag_chunks.jsonl
-cleaned/rag/rag_documents.jsonl
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/

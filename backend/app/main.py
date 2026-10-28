@@ -9,6 +9,7 @@ from backend.app.schemas.chat import ChatRequest, ChatResponse
 from backend.app.services.rag_service import rag_service
 from backend.app.database.mongodb import mongo_client
 from backend.app.database.neo4j_client import neo4j_client
+from backend.app.database.qdrant_client import qdrant_client
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing PatentGraph AI backend services...")
     logger.info(f"MongoDB Status: {'Connected' if mongo_client.connected else 'Offline (Parquet fallback active)'}")
     logger.info(f"Neo4j Status: {'Connected' if neo4j_client.connected else 'Offline (Embedded NetworkX fallback active)'}")
+    logger.info(f"Qdrant Status: {'Connected' if qdrant_client.connected else 'Offline (FAISS vector fallback active)'}")
     yield
     logger.info("Shutting down PatentGraph AI backend services...")
     neo4j_client.close()

@@ -1,0 +1,30 @@
+{
+  "source_file": "C:\\Users\\gowsh\\OneDrive\\Desktop\\RAG\\miniproject\\cleaned\\cleaned_datasets\\cleaned_patents_consolidated.parquet",
+  "source_sha256": "e79bfdd564c73fecfb84f5f1bf0454e9c390dfd105b9430e69f81ebc9dd27456",
+  "source_total_records": 151438,
+  "processed_records": 151438,
+  "upserted_records": 151338,
+  "modified_records": 0,
+  "matched_records": 100,
+  "skipped_records": 0,
+  "failed_records": 0,
+  "quarantined": [],
+  "errors": [],
+  "start_time": "2026-10-27T06:15:08.955667+00:00",
+  "end_time": "2026-10-27T06:28:13.856271+00:00",
+  "duration_seconds": 784.9,
+  "mode": "full",
+  "database": "patentgraph_db",
+  "collection": "patents",
+  "masked_uri": "mongodb+srv:****@cluster0.s8wie4s.mongodb.net/",
+  "indexes_created": [
+    "idx_patent_id_unique",
+    "idx_field_of_invention",
+    "idx_ipo_location",
+    "idx_filing_date",
+    "idx_publication_date",
+    "idx_application_type"
+  ],
+  "initial_destination_count": 100,
+  "final_destination_count": 151438
+}

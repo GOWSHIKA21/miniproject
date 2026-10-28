@@ -1,3 +1,4 @@
+import re
 import math
 import logging
 from typing import List, Dict, Any, Optional
@@ -127,16 +128,27 @@ class HybridRetrievalEngine:
         # 2. Vector Search
         if retrieval_method in ("hybrid", "vector"):
             vector_results = faiss_retriever.search(query_str, top_k=pool_size)
+            num_bm25 = len(bm25_results) if retrieval_method in ("hybrid", "bm25") else 0
             for item in vector_results:
                 pid = item["patent_id"]
                 rank = item["rank"]
-                candidates.setdefault(pid, {
-                    "bm25_rank": None,
-                    "bm25_score": None,
-                    "vector_rank": rank,
-                    "vector_score": item["score"],
-                    "rrf_score": 0.0
-                })
+                v_score = float(item["score"])
+                # Discard ambient vector noise (< 0.38) when keyword search returned 0 hits
+                if num_bm25 == 0 and v_score < 0.38:
+                    continue
+                if v_score < 0.28:
+                    continue
+                if pid not in candidates:
+                    candidates[pid] = {
+                        "bm25_rank": None,
+                        "bm25_score": None,
+                        "vector_rank": rank,
+                        "vector_score": v_score,
+                        "rrf_score": 0.0
+                    }
+                else:
+                    candidates[pid]["vector_rank"] = rank
+                    candidates[pid]["vector_score"] = v_score
                 candidates[pid]["rrf_score"] += 1.2 / (self.k_rrf + rank)
 
         # If vector/keyword search found no candidates, fallback to DB text search
@@ -159,20 +171,20 @@ class HybridRetrievalEngine:
                 )
 
             total_pages = math.ceil(total / effective_page_size) if total > 0 else 1
-            results = [
-                SearchResultItem(
-                    patent=patent_service.to_frontend_format(r, relevance=0.8),
-                    score=0.8,
-                    retrieval_method="text_match",
+            results = []
+            for raw in raw_docs:
+                frontend_patent = patent_service.to_frontend_format(raw, relevance=0.85)
+                results.append(SearchResultItem(
+                    patent=frontend_patent,
+                    score=0.85,
+                    retrieval_method="fallback_text",
                     provenance=SearchProvenance(),
-                    match_evidence="Text match on patent record"
-                )
-                for r in raw_docs
-            ]
+                    match_evidence="Text and metadata match"
+                ))
 
             return SearchResponse(
                 query=query_str,
-                retrieval_method=retrieval_method,
+                retrieval_method="fallback_text",
                 total_found=total,
                 total_matching=total,
                 page=page,
@@ -181,33 +193,35 @@ class HybridRetrievalEngine:
                 results=results
             )
 
-        # 3. Sort candidates by score
-        if retrieval_method == "bm25":
-            sorted_candidates = sorted(candidates.items(), key=lambda x: x[1].get("bm25_score", 0) or 0, reverse=True)
-        elif retrieval_method == "vector":
-            sorted_candidates = sorted(candidates.items(), key=lambda x: x[1].get("vector_score", 0) or 0, reverse=True)
-        else:
-            sorted_candidates = sorted(candidates.items(), key=lambda x: x[1]["rrf_score"], reverse=True)
+        # 3. Sort candidates by RRF score
+        sorted_candidates = sorted(
+            candidates.items(),
+            key=lambda x: x[1]["rrf_score"],
+            reverse=True
+        )
 
-        candidate_ids = [pid for pid, _ in sorted_candidates]
-        records_map = patent_service.get_patents_batch(candidate_ids)
+        # Normalize score baseline
+        max_rrf = sorted_candidates[0][1]["rrf_score"] if sorted_candidates else 1.0
+
+        # Retrieve raw patent records in batch for candidate filtering
+        candidate_pids = [pid for pid, _ in sorted_candidates]
+        records_map = patent_service.get_patents_batch(candidate_pids)
 
         # 4. Filter candidates
         filtered_candidates = []
-        max_rrf = max((data["rrf_score"] for _, data in sorted_candidates), default=1.0) or 1.0
-
         for pid, data in sorted_candidates:
             raw = records_map.get(pid)
             if not raw:
                 continue
 
             if has_filters:
-                # Check field of invention
+                # Check field of invention (exact domain match)
                 techs = filter_dict.get("fields_of_invention") or ([filter_dict.get("field_of_invention")] if filter_dict.get("field_of_invention") else [])
                 techs = [t for t in techs if t and str(t).upper() != "ALL"]
                 if techs:
-                    raw_field = str(raw.get("field_of_invention", "")).upper()
-                    if not any(str(t).strip().upper() in raw_field for t in techs):
+                    raw_field = str(raw.get("field_of_invention", "")).strip().upper()
+                    tech_set = {str(t).strip().upper() for t in techs}
+                    if raw_field not in tech_set:
                         continue
 
                 # Check patent office / IPO location
@@ -217,29 +231,49 @@ class HybridRetrievalEngine:
                     if str(office).strip().upper() not in raw_loc:
                         continue
 
-                # Check inventor
+                # Check inventor (Whole-word matching to avoid false positives like 'tata' in 'rotatable')
                 inv = filter_dict.get("inventor")
                 if inv and str(inv).strip():
-                    inv_term = str(inv).strip().lower()
-                    is_def_inv = any(tok in "government of india ipo record" for tok in inv_term.split())
-                    raw_inv = str(raw.get("inventor", "") or "").lower()
-                    raw_app = str(raw.get("applicant", "") or "").lower()
-                    raw_title = str(raw.get("title", "") or "").lower()
-                    if not is_def_inv and inv_term not in raw_inv and inv_term not in raw_app and inv_term not in raw_title:
-                        continue
+                    inv_term = str(inv).strip()
+                    is_def_inv = any(tok in "government of india ipo record" for tok in inv_term.lower().split() if len(tok) >= 3)
+                    if not is_def_inv:
+                        inv_rx = re.compile(rf"\b{re.escape(inv_term)}\b", re.IGNORECASE)
+                        raw_inv = str(raw.get("inventor", "") or "")
+                        raw_app = str(raw.get("applicant", "") or "")
+                        raw_title = str(raw.get("title", "") or "")
+                        raw_st = str(raw.get("search_text", "") or "")
+                        has_inv = (
+                            bool(inv_rx.search(raw_inv)) or
+                            bool(inv_rx.search(raw_app)) or
+                            bool(inv_rx.search(raw_title)) or
+                            bool(inv_rx.search(raw_st))
+                        )
+                        if not has_inv:
+                            continue
 
-                # Check organisation
+                # Check organisation (Whole-word matching across org, app, ipo_location, title, and search_text)
                 org = filter_dict.get("organization")
                 if org and str(org).strip():
-                    org_term = str(org).strip().lower()
-                    is_def_org = any(tok in org_term for tok in ["indian", "patent", "office", "ipo"])
-                    raw_org = str(raw.get("organization", "") or raw.get("organisation", "") or "").lower()
-                    raw_loc = str(raw.get("ipo_location", "") or "").lower()
-                    raw_title = str(raw.get("title", "") or "").lower()
-                    if not is_def_org and org_term not in raw_org and org_term not in raw_loc and org_term not in raw_title:
-                        continue
+                    org_term = str(org).strip()
+                    is_def_org = any(tok in org_term.lower() for tok in ["indian patent office", "patent office", "ipo record"])
+                    if not is_def_org:
+                        org_rx = re.compile(rf"\b{re.escape(org_term)}\b", re.IGNORECASE)
+                        raw_org = str(raw.get("organization", "") or raw.get("organisation", "") or "")
+                        raw_app = str(raw.get("applicant", "") or "")
+                        raw_loc = str(raw.get("ipo_location", "") or "")
+                        raw_title = str(raw.get("title", "") or "")
+                        raw_st = str(raw.get("search_text", "") or "")
+                        has_org = (
+                            bool(org_rx.search(raw_org)) or
+                            bool(org_rx.search(raw_app)) or
+                            bool(org_rx.search(raw_loc)) or
+                            bool(org_rx.search(raw_title)) or
+                            bool(org_rx.search(raw_st))
+                        )
+                        if not has_org:
+                            continue
 
-                # Check date
+                # Check date & priority date
                 exact_date = filter_dict.get("exact_date")
                 priority_date = filter_dict.get("priority_date")
                 date_from = filter_dict.get("date_from")
@@ -249,11 +283,28 @@ class HybridRetrievalEngine:
                 fil_d = str(raw.get("filing_date", "") or "")
 
                 if exact_date:
-                    if pub_d != exact_date and fil_d != exact_date:
+                    if pub_d != str(exact_date) and fil_d != str(exact_date):
                         continue
                 elif priority_date:
-                    if fil_d != priority_date and pub_d != priority_date:
-                        continue
+                    pyear = str(priority_date).strip()
+                    raw_prio = str(raw.get("priority_date", "") or "").strip()
+                    raw_prio_yr = raw.get("priority_year")
+                    if re.match(r"^\d{4}$", pyear):
+                        year_int = int(pyear)
+                        matched = False
+                        if raw_prio and raw_prio.startswith(pyear) and raw_prio not in ("nan", "None", ""):
+                            matched = True
+                        elif raw_prio_yr == year_int:
+                            matched = True
+                        elif pub_d.startswith(pyear) or fil_d.startswith(pyear):
+                            matched = True
+                        elif raw.get("publication_year") == year_int or raw.get("filing_year") == year_int:
+                            matched = True
+                        if not matched:
+                            continue
+                    else:
+                        if fil_d != pyear and pub_d != pyear and raw_prio != pyear:
+                            continue
                 else:
                     if date_from:
                         if (pub_d and pub_d < date_from) and (fil_d and fil_d < date_from):
@@ -265,9 +316,13 @@ class HybridRetrievalEngine:
             filtered_candidates.append((pid, data, raw))
 
         # Check total count across database if filtered
-        if has_filters and mongo_client.connected:
-            db_total, _ = mongo_client.search_patents(query_text=query_str, filters=filter_dict, page_size=1)
-            total_found = max(len(filtered_candidates), db_total)
+        if has_filters:
+            if mongo_client.connected:
+                db_total, _ = mongo_client.search_patents(query_text=query_str, filters=filter_dict, page_size=1)
+                total_found = max(len(filtered_candidates), db_total)
+            else:
+                db_total, _ = patent_service.search_fallback(query_text=query_str, filters=filter_dict, page_size=1)
+                total_found = max(len(filtered_candidates), db_total)
         else:
             total_found = len(filtered_candidates)
 

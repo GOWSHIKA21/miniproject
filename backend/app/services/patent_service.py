@@ -15,70 +15,166 @@ class PatentService:
 
     def _get_fallback_df(self) -> pd.DataFrame:
         if self._df_cache is None:
-            if os.path.exists(settings.CLEANED_DATA_PATH):
-                self._df_cache = pd.read_parquet(settings.CLEANED_DATA_PATH)
+            data_path = settings.CLEANED_DATA_PATH
+            if not os.path.exists(data_path):
+                # Fallback to relative or app dir
+                candidate = os.path.join(os.path.dirname(__file__), "..", "data", "cleaned_patents.parquet")
+                if os.path.exists(candidate):
+                    data_path = candidate
+            if os.path.exists(data_path):
+                self._df_cache = pd.read_parquet(data_path)
             else:
                 self._df_cache = pd.DataFrame()
         return self._df_cache
 
     def to_frontend_format(self, record: Dict[str, Any], relevance: Optional[float] = None) -> PatentFrontendFormat:
-        """Convert an internal patent record into the format required by React PatentCard and PatentDetails."""
-        p_id = str(record.get("patent_id", ""))
-        field = str(record.get("field_of_invention", "GENERAL"))
-        loc = str(record.get("ipo_location", "India"))
-        app_type = str(record.get("application_type", "Patent"))
+        """Convert an internal patent record into the comprehensive format required by React PatentCard and PatentDetails."""
+        p_id = str(record.get("patent_id", "") or "").strip()
+        pub_no = str(record.get("publication_number", "") or "").strip() or None
+        title = str(record.get("title", "") or "").strip()
+        title_norm = str(record.get("title_normalized", "") or "").strip() or None
+        
+        field = str(record.get("field_of_invention", "") or "").strip() or None
+        field_imp = record.get("field_imputed")
+        field_imp_bool = bool(field_imp) if field_imp is not None and not pd.isna(field_imp) else None
+        
+        loc = str(record.get("ipo_location", "") or "").strip() or None
+        code = str(record.get("ipo_code", "") or "").strip() or None
+        
+        app_type = str(record.get("application_type", "") or "").strip() or None
+        app_cat = str(record.get("application_category", "") or "").strip() or None
+        
+        filing_d = str(record.get("filing_date", "") or "").strip() or None
+        pub_d = str(record.get("publication_date", "") or "").strip() or None
+        date_upd = str(record.get("date_updated", "") or "").strip() or None
+        
+        filing_yr = record.get("filing_year")
+        filing_yr_int = int(filing_yr) if filing_yr is not None and not pd.isna(filing_yr) else None
+        
+        pub_yr = record.get("publication_year")
+        pub_yr_int = int(pub_yr) if pub_yr is not None and not pd.isna(pub_yr) else None
+        
+        pendency = record.get("pendency_days")
+        pendency_int = int(pendency) if pendency is not None and not pd.isna(pendency) else None
+        
         claims = record.get("no_of_claims")
+        claims_int = int(claims) if claims is not None and not pd.isna(claims) else None
+        
         pages = record.get("no_of_pages")
-
-        # Create informative abstract snippet explaining the patent details
-        claims_str = f"{int(claims)} claims" if claims is not None and not pd.isna(claims) else "Unspecified claims"
-        pages_str = f"{int(pages)} pages" if pages is not None and not pd.isna(pages) else "Unspecified pages"
-        abstract_snippet = (
-            f"Granted Indian Patent Application ({p_id}) published at IPO {loc} under the technical domain of {field}. "
-            f"Filing Type: {app_type}. Specification comprises {pages_str} with {claims_str}. "
-            f"Verified under Government of India Patent Journal Gazette records."
-        )
-
-        tech_tags = [field]
+        pages_int = int(pages) if pages is not None and not pd.isna(pages) else None
+        
+        claims_rng = str(record.get("claims_range", "") or "").strip() or None
+        
+        claims_imp = record.get("no_of_claims_imputed")
+        claims_imp_int = int(claims_imp) if claims_imp is not None and not pd.isna(claims_imp) else None
+        
+        pages_imp = record.get("no_of_pages_imputed")
+        pages_imp_int = int(pages_imp) if pages_imp is not None and not pd.isna(pages_imp) else None
+        
+        jurisdiction = str(record.get("jurisdiction", "India") or "India").strip()
+        source_f = str(record.get("source_file", "") or "").strip() or None
+        source_u = str(record.get("source_url", "") or "").strip() or None
+        search_t = str(record.get("search_text", "") or "").strip() or None
+        
+        # Technology tags
+        tech_tags = []
+        if field:
+            tech_tags.append(field)
         if app_type and app_type != "Patent":
-            tech_tags.append(app_type.replace(" APPLICATION", "").title())
-
+            tech_tags.append(app_type.replace(" Application", "").replace(" APPLICATION", "").title())
+        
         # Scale relevance percentage
         rel_pct = None
         if relevance is not None:
             rel_pct = round(float(relevance) * 100, 1)
 
+        # Build concise factual summary for cards without fabricating claims or specifications
+        summary_parts = []
+        if app_type:
+            summary_parts.append(f"{app_type}")
+        if loc:
+            summary_parts.append(f"IPO {loc} ({code or 'India'})")
+        if pages_int is not None and claims_int is not None:
+            summary_parts.append(f"{pages_int} pages, {claims_int} claims")
+        elif claims_int is not None:
+            summary_parts.append(f"{claims_int} claims")
+        if filing_d and pub_d:
+            summary_parts.append(f"Filed {filing_d}, Published {pub_d}")
+        summary_text = " • ".join(summary_parts) if summary_parts else (search_t or "Official Indian Patent Office publication record.")
+
         return PatentFrontendFormat(
             id=p_id,
-            patentNumber=p_id,
-            title=str(record.get("title", "")),
-            abstract=abstract_snippet,
-            inventor="Government of India IPO Record",
-            organization=f"Indian Patent Office ({loc} Branch)",
-            patentOffice="India",
-            ipoLocation=loc,
-            filingDate=str(record.get("filing_date", "")) if record.get("filing_date") else None,
-            publicationDate=str(record.get("publication_date", "")) if record.get("publication_date") else None,
+            patentNumber=pub_no or p_id,
+            patent_id=p_id,
+            patentId=p_id,
+            publication_number=pub_no,
+            publicationNumber=pub_no,
+            title=title,
+            title_normalized=title_norm,
+            titleNormalized=title_norm,
+            filing_date=filing_d,
+            filingDate=filing_d,
+            publication_date=pub_d,
+            publicationDate=pub_d,
+            date_updated=date_upd,
+            dateUpdated=date_upd,
+            filing_year=filing_yr_int,
+            filingYear=filing_yr_int,
+            publication_year=pub_yr_int,
+            publicationYear=pub_yr_int,
+            pendency_days=pendency_int,
+            pendencyDays=pendency_int,
+            field_of_invention=field,
+            fieldOfInvention=field,
+            field_imputed=field_imp_bool,
+            fieldImputed=field_imp_bool,
             technology=tech_tags,
             ipc=field,
+            jurisdiction=jurisdiction,
+            ipo_location=loc,
+            ipoLocation=loc,
+            ipo_code=code,
+            ipoCode=code,
+            patentOffice=jurisdiction,
+            application_type=app_type,
+            applicationType=app_type,
+            application_category=app_cat,
+            applicationCategory=app_cat,
+            no_of_pages=pages_int,
+            noOfPages=pages_int,
+            no_of_claims=claims_int,
+            noOfClaims=claims_int,
+            claims_range=claims_rng,
+            claimsRange=claims_rng,
+            no_of_pages_imputed=pages_imp_int,
+            noOfPagesImputed=pages_imp_int,
+            no_of_claims_imputed=claims_imp_int,
+            noOfClaimsImputed=claims_imp_int,
+            source_file=source_f,
+            sourceFile=source_f,
+            source_url=source_u,
+            sourceUrl=source_u,
+            search_text=search_t,
+            searchText=search_t,
             relevance=rel_pct,
-            status="Granted",
-            noOfClaims=int(claims) if claims is not None and not pd.isna(claims) else None,
-            noOfPages=int(pages) if pages is not None and not pd.isna(pages) else None,
-            sourceUrl=record.get("source_url", "https://ipindiaservices.gov.in/publicsearch/"),
+            abstract=summary_text,
+            inventor=record.get("inventor") or "Government of India IPO Record",
+            organization=record.get("organization") or (f"Indian Patent Office ({loc} Branch)" if loc else "Indian Patent Office"),
+            status=record.get("status") or (f"Published ({app_cat or 'Application'})"),
             isSaved=False
         )
 
     def get_patent_by_id(self, patent_id: str) -> Optional[PatentFrontendFormat]:
+        clean_id = str(patent_id).strip()
         # 1. Try MongoDB
-        doc = mongo_client.get_patent(patent_id)
+        doc = mongo_client.get_patent(clean_id)
         if doc:
             return self.to_frontend_format(doc)
 
         # 2. Try Parquet fallback
         df = self._get_fallback_df()
         if not df.empty:
-            matches = df[df["patent_id"] == patent_id]
+            matches = df[df["patent_id"].astype(str) == clean_id]
             if not matches.empty:
                 return self.to_frontend_format(matches.iloc[0].to_dict())
 
@@ -115,7 +211,7 @@ class PatentService:
         """Aggregate stats for the Home and Explorer pages."""
         df = self._get_fallback_df()
         if df.empty:
-            return {"total_patents": 0, "domains": {}}
+            return {"total_patents": 0, "domains": {}, "field_counts": {}}
 
         total = len(df)
         field_counts = df["field_of_invention"].value_counts().to_dict()
@@ -137,7 +233,7 @@ class PatentService:
         page: int = 1,
         page_size: int = 25
     ) -> tuple[int, List[Dict[str, Any]]]:
-        """In-memory Parquet fallback search with filter support, counting, and pagination."""
+        """In-memory Parquet fallback search with exact domain matching, priority-year filtering, counting, and pagination."""
         df = self._get_fallback_df()
         if df.empty:
             return (0, [])
@@ -145,41 +241,122 @@ class PatentService:
         mask = pd.Series(True, index=df.index)
 
         if filters:
-            # 1. Tech domains
+            # 1. Tech domains (exact domain match to prevent 'Chemistry' matching 'Biochemistry')
             techs = filters.get("fields_of_invention") or ([filters.get("field_of_invention")] if filters.get("field_of_invention") else [])
-            techs = [t for t in techs if t and str(t).upper() != "ALL"]
+            techs = [str(t).strip().upper() for t in techs if t and str(t).upper() != "ALL"]
             if techs:
-                pattern = "|".join(re.escape(str(t).strip()) for t in techs)
-                mask &= df["field_of_invention"].astype(str).str.contains(pattern, case=False, na=False)
+                mask &= df["field_of_invention"].astype(str).str.upper().isin(techs)
 
             # 2. Location
             office = filters.get("ipo_location")
             if office and str(office).upper() not in ("ALL", "ALL PATENT OFFICES", ""):
                 mask &= df["ipo_location"].astype(str).str.contains(re.escape(str(office).strip()), case=False, na=False)
 
-            # 3. Dates
+            # 3. Application Type
+            app_type = filters.get("application_type")
+            if app_type and str(app_type).upper() not in ("ALL", ""):
+                mask &= df["application_type"].astype(str).str.contains(re.escape(str(app_type).strip()), case=False, na=False)
+
+            # 4. Dates & Priority Date (Year Only or Exact Date)
             exact_date = filters.get("exact_date")
             priority_date = filters.get("priority_date")
             date_from = filters.get("date_from")
             date_to = filters.get("date_to")
 
             if exact_date:
-                mask &= (df["publication_date"] == exact_date) | (df["filing_date"] == exact_date)
+                mask &= (df["publication_date"].astype(str) == str(exact_date)) | (df["filing_date"].astype(str) == str(exact_date))
             elif priority_date:
-                mask &= (df["filing_date"] == priority_date) | (df["publication_date"] == priority_date)
+                pyear = str(priority_date).strip()
+                if re.match(r"^\d{4}$", pyear):
+                    year_int = int(pyear)
+                    # Check priority_date column if explicitly present in dataset
+                    if "priority_date" in df.columns:
+                        prio_series = df["priority_date"].astype(str)
+                        prio_mask = prio_series.str.startswith(pyear) & (~prio_series.isin(["nan", "None", ""]))
+                        if prio_mask.any():
+                            mask &= prio_mask
+                        else:
+                            year_mask = (
+                                df["publication_date"].astype(str).str.startswith(pyear) |
+                                df["filing_date"].astype(str).str.startswith(pyear)
+                            )
+                            if "publication_year" in df.columns:
+                                year_mask |= (df["publication_year"] == year_int)
+                            if "filing_year" in df.columns:
+                                year_mask |= (df["filing_year"] == year_int)
+                            mask &= year_mask
+                    else:
+                        # Dedicated priority-date filter safely applied strictly to patent date/year fields
+                        year_mask = (
+                            df["publication_date"].astype(str).str.startswith(pyear) |
+                            df["filing_date"].astype(str).str.startswith(pyear)
+                        )
+                        if "publication_year" in df.columns:
+                            year_mask |= (df["publication_year"] == year_int)
+                        if "filing_year" in df.columns:
+                            year_mask |= (df["filing_year"] == year_int)
+                        mask &= year_mask
+                else:
+                    if "priority_date" in df.columns:
+                        mask &= (df["priority_date"].astype(str) == pyear)
+                    else:
+                        mask &= (df["filing_date"].astype(str) == pyear) | (df["publication_date"].astype(str) == pyear)
             else:
-                if date_from:
-                    mask &= (df["publication_date"] >= date_from) | (df["filing_date"] >= date_from)
-                if date_to:
-                    mask &= (df["publication_date"] <= date_to) | (df["filing_date"] <= date_to)
+                if date_from and date_to:
+                    mask &= (
+                        ((df["publication_date"].astype(str) >= str(date_from)) & (df["publication_date"].astype(str) <= str(date_to))) |
+                        ((df["filing_date"].astype(str) >= str(date_from)) & (df["filing_date"].astype(str) <= str(date_to)))
+                    )
+                elif date_from:
+                    mask &= (df["publication_date"].astype(str) >= str(date_from)) | (df["filing_date"].astype(str) >= str(date_from))
+                elif date_to:
+                    mask &= (df["publication_date"].astype(str) <= str(date_to)) | (df["filing_date"].astype(str) <= str(date_to))
+
+            # 5. Inventor (Whole-word matching to avoid false positives like 'tata' in 'rotatable')
+            inv = filters.get("inventor")
+            if inv and str(inv).strip():
+                inv_clean = str(inv).strip()
+                is_default_inv = any(tok in "government of india ipo record" for tok in inv_clean.lower().split() if len(tok) >= 3)
+                if not is_default_inv:
+                    inv_rx = rf"\b{re.escape(inv_clean)}\b"
+                    inv_mask = pd.Series(False, index=df.index)
+                    if "inventor" in df.columns:
+                        inv_mask |= df["inventor"].astype(str).str.contains(inv_rx, case=False, regex=True, na=False)
+                    if "applicant" in df.columns:
+                        inv_mask |= df["applicant"].astype(str).str.contains(inv_rx, case=False, regex=True, na=False)
+                    inv_mask |= df["title"].astype(str).str.contains(inv_rx, case=False, regex=True, na=False)
+                    inv_mask |= df["search_text"].astype(str).str.contains(inv_rx, case=False, regex=True, na=False)
+                    mask &= inv_mask
+
+            # 6. Organization (Whole-word matching across IPO location, applicant, title, and search_text)
+            org = filters.get("organization")
+            if org and str(org).strip():
+                org_clean = str(org).strip()
+                is_default_org = any(tok in org_clean.lower() for tok in ["indian patent office", "patent office", "ipo record"])
+                if not is_default_org:
+                    org_rx = rf"\b{re.escape(org_clean)}\b"
+                    org_mask = pd.Series(False, index=df.index)
+                    org_mask |= df["ipo_location"].astype(str).str.contains(org_rx, case=False, regex=True, na=False)
+                    if "organization" in df.columns:
+                        org_mask |= df["organization"].astype(str).str.contains(org_rx, case=False, regex=True, na=False)
+                    if "applicant" in df.columns:
+                        org_mask |= df["applicant"].astype(str).str.contains(org_rx, case=False, regex=True, na=False)
+                    org_mask |= df["title"].astype(str).str.contains(org_rx, case=False, regex=True, na=False)
+                    org_mask |= df["search_text"].astype(str).str.contains(org_rx, case=False, regex=True, na=False)
+                    mask &= org_mask
 
         if query_text and query_text.strip() and query_text.strip().lower() not in ("patent invention", "all", "*"):
-            q_clean = re.escape(query_text.strip())
-            mask &= (
-                df["patent_id"].astype(str).str.contains(q_clean, case=False, na=False) |
-                df["title"].astype(str).str.contains(q_clean, case=False, na=False) |
-                df["search_text"].astype(str).str.contains(q_clean, case=False, na=False)
-            )
+            q_clean = query_text.strip()
+            id_match = df["patent_id"].astype(str).str.contains(re.escape(q_clean), case=False, na=False)
+            q_terms = [t for t in q_clean.split() if t]
+            text_match = pd.Series(True, index=df.index)
+            for t in q_terms:
+                t_rx = rf"\b{re.escape(t)}\b"
+                text_match &= (
+                    df["title"].astype(str).str.contains(t_rx, case=False, regex=True, na=False) |
+                    df["search_text"].astype(str).str.contains(t_rx, case=False, regex=True, na=False)
+                )
+            mask &= (id_match | text_match)
 
         filtered = df[mask]
         total = len(filtered)

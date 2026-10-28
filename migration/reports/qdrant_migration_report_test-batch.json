@@ -1,0 +1,16 @@
+{
+  "mode": "test-batch",
+  "target_url": "https://f926cdb3-3b12-47ea-9d60-e29fb6b159ff.ca-central-1-0.aws.cloud.qdrant.io",
+  "collection": "patent_embeddings",
+  "source_type": "faiss",
+  "dimension": 384,
+  "distance": "Cosine",
+  "start_time": "2026-10-27T12:19:05.313950+00:00",
+  "end_time": "",
+  "duration_seconds": 0.0,
+  "total_points_prepared": 0,
+  "total_points_upserted": 0,
+  "errors": [
+    "Connection failure: Unexpected Response: 403 (Forbidden)\nRaw response content:\nb'{\"error\":\"forbidden\"}'"
+  ]
+}
