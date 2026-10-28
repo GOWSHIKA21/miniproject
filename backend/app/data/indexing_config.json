@@ -1,0 +1,10 @@
+{
+  "embedding_model": "all-MiniLM-L6-v2",
+  "dimension": 384,
+  "total_indexed": 2000,
+  "index_type": "IndexFlatIP",
+  "metric": "cosine_similarity",
+  "faiss_file": "backend/app/data/faiss_index.bin",
+  "bm25_file": "backend/app/data/bm25_index.pkl",
+  "timestamp": "2026-10-26T22:41:24.405071"
+}
