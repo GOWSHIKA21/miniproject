@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import Search from './pages/Search';
 import Explorer from './pages/Explorer';
-import KnowledgeGraph from './pages/KnowledgeGraph';
 import AIAssistant from './pages/AIAssistant';
 import PatentDetails from './pages/PatentDetails';
 
@@ -53,14 +52,14 @@ function App() {
               <Route path="/" element={<Home isDarkTheme={isDarkTheme} />} />
               <Route path="/search" element={<Search isDarkTheme={isDarkTheme} />} />
               <Route path="/explorer" element={<Explorer isDarkTheme={isDarkTheme} />} />
-              <Route path="/graph" element={<KnowledgeGraph isDarkTheme={isDarkTheme} />} />
+              <Route path="/graph" element={<Navigate to="/explorer" replace />} />
               <Route path="/assistant" element={<AIAssistant isDarkTheme={isDarkTheme} />} />
               <Route path="/patent/*" element={<PatentDetails isDarkTheme={isDarkTheme} />} />
               <Route path="/patents/*" element={<PatentDetails isDarkTheme={isDarkTheme} />} />
             </Routes>
           </main>
 
-          {/* Footer */}
+          {/* Clean App Footer */}
           <Footer isDarkTheme={isDarkTheme} />
         </div>
 

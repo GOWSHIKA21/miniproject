@@ -1,20 +1,26 @@
-import re
 import math
 import logging
+import re
 from typing import List, Dict, Any, Optional
+
 from backend.app.schemas.search import (
-    SearchRequest,
-    SearchResponse,
+    SearchFilters,
     SearchResultItem,
     SearchProvenance,
-    SearchFilters
+    SearchResponse
 )
 from backend.app.retrieval.keyword_search import bm25_retriever
 from backend.app.retrieval.vector_search import faiss_retriever
-from backend.app.database.mongodb import mongo_client
 from backend.app.services.patent_service import patent_service
+from backend.app.database.mongodb import mongo_client
+from backend.app.retrieval.query_expander import (
+    clean_nl_query,
+    detect_exact_identifier,
+    get_expanded_search_query
+)
 
 logger = logging.getLogger(__name__)
+
 
 class HybridRetrievalEngine:
     def __init__(self, k_rrf: int = 60):
@@ -23,20 +29,28 @@ class HybridRetrievalEngine:
     def _filters_to_dict(self, filters: Optional[SearchFilters]) -> Dict[str, Any]:
         if not filters:
             return {}
-        return {
-            "field_of_invention": filters.field_of_invention,
-            "fields_of_invention": filters.fields_of_invention,
-            "ipo_location": filters.ipo_location,
-            "inventor": filters.inventor,
-            "organization": filters.organization,
-            "application_type": filters.application_type,
-            "date_type": filters.date_type,
-            "priority_date": filters.priority_date,
-            "exact_date": filters.exact_date,
-            "date_from": filters.date_from,
-            "date_to": filters.date_to,
-            "status": filters.status
-        }
+        d = {}
+        if filters.field_of_invention:
+            d["field_of_invention"] = filters.field_of_invention
+        if filters.fields_of_invention:
+            d["fields_of_invention"] = filters.fields_of_invention
+        if filters.ipo_location:
+            d["ipo_location"] = filters.ipo_location
+        if filters.inventor:
+            d["inventor"] = filters.inventor
+        if filters.organization:
+            d["organization"] = filters.organization
+        if filters.date_from:
+            d["date_from"] = filters.date_from
+        if filters.date_to:
+            d["date_to"] = filters.date_to
+        if filters.exact_date:
+            d["exact_date"] = filters.exact_date
+        if filters.priority_date:
+            d["priority_date"] = filters.priority_date
+        if filters.application_type:
+            d["application_type"] = filters.application_type
+        return d
 
     def _has_active_filters(self, filter_dict: Dict[str, Any]) -> bool:
         for k, v in filter_dict.items():
@@ -110,9 +124,30 @@ class HybridRetrievalEngine:
         candidates = {}  # pid -> {bm25_rank, vector_rank, bm25_score, vector_score, rrf_score}
         pool_size = max(500, effective_page_size * 20)
 
-        # 1. BM25 Search
+        # Check for exact patent ID or publication number match
+        exact_id_info = detect_exact_identifier(query_str)
+        exact_match_patent = None
+        if exact_id_info:
+            id_type, id_val = exact_id_info
+            if id_type == "patent_id":
+                exact_p = patent_service.get_patent_by_id(id_val)
+                if exact_p:
+                    exact_match_patent = exact_p
+            elif id_type == "publication_number":
+                # Look up in DB by publication number
+                df = patent_service._get_fallback_df()
+                if not df.empty and "publication_number" in df.columns:
+                    pub_matches = df[df["publication_number"].astype(str).str.strip() == id_val]
+                    if not pub_matches.empty:
+                        exact_p = patent_service.to_frontend_format(pub_matches.iloc[0].to_dict())
+                        exact_match_patent = exact_p
+
+        cleaned_core = clean_nl_query(query_str)
+        expanded_query = get_expanded_search_query(query_str)
+
+        # 1. BM25 Search (search expanded query for domain synonym recall)
         if retrieval_method in ("hybrid", "bm25"):
-            bm25_results = bm25_retriever.search(query_str, top_k=pool_size)
+            bm25_results = bm25_retriever.search(expanded_query, top_k=pool_size)
             for item in bm25_results:
                 pid = item["patent_id"]
                 rank = item["rank"]
@@ -125,17 +160,14 @@ class HybridRetrievalEngine:
                 })
                 candidates[pid]["rrf_score"] += 1.0 / (self.k_rrf + rank)
 
-        # 2. Vector Search
+        # 2. Vector Search (run on core query)
         if retrieval_method in ("hybrid", "vector"):
-            vector_results = faiss_retriever.search(query_str, top_k=pool_size)
-            num_bm25 = len(bm25_results) if retrieval_method in ("hybrid", "bm25") else 0
+            vector_results = faiss_retriever.search(cleaned_core, top_k=pool_size)
             for item in vector_results:
                 pid = item["patent_id"]
                 rank = item["rank"]
                 v_score = float(item["score"])
-                # Discard ambient vector noise (< 0.38) when keyword search returned 0 hits
-                if num_bm25 == 0 and v_score < 0.38:
-                    continue
+                # Discard noise below calibrated baseline (0.28)
                 if v_score < 0.28:
                     continue
                 if pid not in candidates:
@@ -150,6 +182,17 @@ class HybridRetrievalEngine:
                     candidates[pid]["vector_rank"] = rank
                     candidates[pid]["vector_score"] = v_score
                 candidates[pid]["rrf_score"] += 1.2 / (self.k_rrf + rank)
+
+        # Promote exact identifier match to Rank #1
+        if exact_match_patent:
+            eid = exact_match_patent.patent_id or exact_match_patent.id
+            candidates[eid] = {
+                "bm25_rank": 1,
+                "bm25_score": 99.0,
+                "vector_rank": 1,
+                "vector_score": 1.0,
+                "rrf_score": 999.0
+            }
 
         # If vector/keyword search found no candidates, fallback to DB text search
         if not candidates:
@@ -193,6 +236,21 @@ class HybridRetrievalEngine:
                 results=results
             )
 
+        # Batch fetch patent records for candidate metadata and title boosting
+        candidate_pids = list(candidates.keys())
+        records_map = patent_service.get_patents_batch(candidate_pids)
+
+        # Exact title and phrase match boost
+        q_norm = query_str.lower().strip()
+        for pid, data in candidates.items():
+            raw = records_map.get(pid)
+            if raw:
+                raw_title = str(raw.get("title", "") or "").lower().strip()
+                if q_norm == raw_title:
+                    data["rrf_score"] += 10.0
+                elif len(q_norm) > 8 and q_norm in raw_title:
+                    data["rrf_score"] += 3.0
+
         # 3. Sort candidates by RRF score
         sorted_candidates = sorted(
             candidates.items(),
@@ -202,10 +260,6 @@ class HybridRetrievalEngine:
 
         # Normalize score baseline
         max_rrf = sorted_candidates[0][1]["rrf_score"] if sorted_candidates else 1.0
-
-        # Retrieve raw patent records in batch for candidate filtering
-        candidate_pids = [pid for pid, _ in sorted_candidates]
-        records_map = patent_service.get_patents_batch(candidate_pids)
 
         # 4. Filter candidates
         filtered_candidates = []
@@ -231,7 +285,7 @@ class HybridRetrievalEngine:
                     if str(office).strip().upper() not in raw_loc:
                         continue
 
-                # Check inventor (Whole-word matching to avoid false positives like 'tata' in 'rotatable')
+                # Check inventor (Whole-word matching)
                 inv = filter_dict.get("inventor")
                 if inv and str(inv).strip():
                     inv_term = str(inv).strip()
@@ -251,7 +305,7 @@ class HybridRetrievalEngine:
                         if not has_inv:
                             continue
 
-                # Check organisation (Whole-word matching across org, app, ipo_location, title, and search_text)
+                # Check organisation
                 org = filter_dict.get("organization")
                 if org and str(org).strip():
                     org_term = str(org).strip()
@@ -335,19 +389,23 @@ class HybridRetrievalEngine:
 
         results = []
         for pid, data, raw in page_slice:
-            if retrieval_method == "vector" and data["vector_score"] is not None:
+            if data["rrf_score"] >= 900.0:
+                norm_score = 1.0
+                match_evidence = "Exact patent identifier match"
+            elif retrieval_method == "vector" and data["vector_score"] is not None:
                 norm_score = max(0.0, min(1.0, float(data["vector_score"])))
+                match_evidence = f"Semantic vector match (Rank #{data['vector_rank']})"
             elif retrieval_method == "bm25" and data["bm25_score"] is not None:
                 norm_score = min(1.0, float(data["bm25_score"]) / 25.0)
+                match_evidence = f"Keyword match (Rank #{data['bm25_rank']})"
             else:
                 norm_score = min(1.0, data["rrf_score"] / max_rrf)
-
-            evidence_parts = []
-            if data["vector_rank"] is not None:
-                evidence_parts.append(f"Semantic vector match (Rank #{data['vector_rank']})")
-            if data["bm25_rank"] is not None:
-                evidence_parts.append(f"Keyword match (Rank #{data['bm25_rank']})")
-            match_evidence = " & ".join(evidence_parts) if evidence_parts else "Metadata filter match"
+                evidence_parts = []
+                if data["vector_rank"] is not None:
+                    evidence_parts.append(f"Semantic vector match (Rank #{data['vector_rank']})")
+                if data["bm25_rank"] is not None:
+                    evidence_parts.append(f"Keyword match (Rank #{data['bm25_rank']})")
+                match_evidence = " & ".join(evidence_parts) if evidence_parts else "Metadata filter match"
 
             frontend_patent = patent_service.to_frontend_format(raw, relevance=norm_score)
             provenance = SearchProvenance(
@@ -375,5 +433,6 @@ class HybridRetrievalEngine:
             total_pages=total_pages,
             results=results
         )
+
 
 hybrid_retrieval_engine = HybridRetrievalEngine()

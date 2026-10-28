@@ -22,6 +22,7 @@ class CloudVectorRetriever:
         self.id_map_path = id_map_path
         self.index: Optional[faiss.Index] = None
         self.index_to_patent_id: Dict[str, str] = {}
+        self.patent_id_to_index: Dict[str, int] = {}
         self._load_local_faiss()
 
     def _load_local_faiss(self):
@@ -31,11 +32,58 @@ class CloudVectorRetriever:
                 with open(self.id_map_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.index_to_patent_id = data.get("index_to_patent_id", {})
+                    p2i = data.get("patent_id_to_index", {})
+                    if p2i:
+                        self.patent_id_to_index = p2i
+                    else:
+                        self.patent_id_to_index = {v: int(k) for k, v in self.index_to_patent_id.items()}
                 logger.info(f"Loaded local FAISS index with {self.index.ntotal:,} vectors (dim={self.index.d}).")
             except Exception as e:
                 logger.error(f"Error loading local FAISS index: {e}")
         else:
             logger.warning(f"Local FAISS index files not found at {self.index_path}")
+
+    def get_patent_vector(self, patent_id: str, fallback_text: Optional[str] = None) -> Optional[np.ndarray]:
+        """
+        Extract the stored unit-normalized 384-dim vector for a patent.
+        If patent is in the FAISS index, reconstructs vector in <1ms without re-encoding.
+        If not in index but fallback text is provided, encodes using the embedding model.
+        """
+        clean_id = str(patent_id).strip()
+        idx = self.patent_id_to_index.get(clean_id)
+        if idx is not None and self.index is not None and hasattr(self.index, "reconstruct"):
+            try:
+                vec = self.index.reconstruct(int(idx))
+                return vec.reshape(1, -1)
+            except Exception as e:
+                logger.debug(f"Could not reconstruct vector for {clean_id}: {e}")
+
+        if fallback_text:
+            embed_model = get_embedding_model()
+            return embed_model.encode([fallback_text])
+
+        return None
+
+    def search_by_vector(self, vector: np.ndarray, top_k: int = 30) -> List[Dict[str, Any]]:
+        """Perform cosine similarity search on FAISS directly with a pre-computed unit vector."""
+        if not self.index or self.index.ntotal == 0 or vector is None:
+            return []
+
+        distances, indices = self.index.search(vector, top_k)
+        results = []
+        for rank, (score, idx) in enumerate(zip(distances[0], indices[0]), start=1):
+            if idx < 0:
+                continue
+            pid = self.index_to_patent_id.get(str(idx))
+            if not pid:
+                continue
+            results.append({
+                "patent_id": pid,
+                "score": float(score),
+                "rank": rank,
+                "retriever": "vector_faiss"
+            })
+        return results
 
     def search(self, query: str, top_k: int = 50, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Encode query and perform cosine similarity search via Qdrant Cloud or FAISS fallback."""
@@ -52,25 +100,7 @@ class CloudVectorRetriever:
                 logger.warning(f"Qdrant Cloud search failed ({e}). Falling back to local FAISS.")
 
         # 2. Resilient Fallback: Local FAISS Index
-        if not self.index or self.index.ntotal == 0:
-            return []
-
-        distances, indices = self.index.search(query_vec, top_k)
-
-        results = []
-        for rank, (score, idx) in enumerate(zip(distances[0], indices[0]), start=1):
-            if idx < 0:
-                continue
-            patent_id = self.index_to_patent_id.get(str(idx))
-            if not patent_id:
-                continue
-            results.append({
-                "patent_id": patent_id,
-                "score": float(score),
-                "rank": rank,
-                "retriever": "vector_faiss"
-            })
-        return results
+        return self.search_by_vector(query_vec, top_k=top_k)
 
 
 # Backward compatibility singleton aliases

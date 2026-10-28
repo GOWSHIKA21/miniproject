@@ -23,9 +23,10 @@ const QUICK_PROMPTS = [
 // ─── Minimal Markdown Renderer ───────────────────────────────────────────────
 // Renders a safe subset of markdown without any external dependency.
 // Handles: **bold**, *italic*, headings (#, ##, ###), bullet lists (-, *),
-// numbered lists, horizontal rules (---), and code spans (`code`).
+// numbered lists, horizontal rules (---), code spans (`code`), and clickable
+// bracketed patent numbers (e.g. [10/DEL/2010]).
 
-function renderMarkdown(text) {
+function renderMarkdown(text, onPatentClick) {
   if (!text) return null;
 
   const lines = text.split('\n');
@@ -37,7 +38,7 @@ function renderMarkdown(text) {
   const flushList = () => {
     if (listBuffer.length === 0) return;
     const items = listBuffer.map((item, idx) => (
-      <li key={idx} className="ml-1">{inlineMarkdown(item)}</li>
+      <li key={idx} className="ml-1">{inlineMarkdown(item, onPatentClick)}</li>
     ));
     if (listType === 'ol') {
       elements.push(<ol key={`ol-${i}`} className="list-decimal list-outside ml-4 space-y-0.5 my-1">{items}</ol>);
@@ -54,17 +55,17 @@ function renderMarkdown(text) {
     // Heading 1
     if (/^# /.test(line)) {
       flushList();
-      elements.push(<h2 key={i} className="text-base font-extrabold mt-3 mb-1">{inlineMarkdown(line.slice(2))}</h2>);
+      elements.push(<h2 key={i} className="text-base font-extrabold mt-3 mb-1">{inlineMarkdown(line.slice(2), onPatentClick)}</h2>);
     }
     // Heading 2
     else if (/^## /.test(line)) {
       flushList();
-      elements.push(<h3 key={i} className="text-sm font-bold mt-2 mb-1">{inlineMarkdown(line.slice(3))}</h3>);
+      elements.push(<h3 key={i} className="text-sm font-bold mt-2 mb-1">{inlineMarkdown(line.slice(3), onPatentClick)}</h3>);
     }
     // Heading 3
     else if (/^### /.test(line)) {
       flushList();
-      elements.push(<h4 key={i} className="text-xs font-bold mt-2 mb-0.5">{inlineMarkdown(line.slice(4))}</h4>);
+      elements.push(<h4 key={i} className="text-xs font-bold mt-2 mb-0.5">{inlineMarkdown(line.slice(4), onPatentClick)}</h4>);
     }
     // Horizontal rule
     else if (/^---+$/.test(line.trim())) {
@@ -89,7 +90,7 @@ function renderMarkdown(text) {
     // Normal paragraph
     else {
       flushList();
-      elements.push(<p key={i} className="my-0.5">{inlineMarkdown(line)}</p>);
+      elements.push(<p key={i} className="my-0.5">{inlineMarkdown(line, onPatentClick)}</p>);
     }
     i++;
   }
@@ -97,10 +98,10 @@ function renderMarkdown(text) {
   return elements;
 }
 
-function inlineMarkdown(text) {
-  // Process inline: **bold**, *italic*, `code`
+function inlineMarkdown(text, onPatentClick) {
+  // Process inline: **bold**, *italic*, `code`, and [patentId] citations
   const parts = [];
-  const regex = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
+  const regex = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[\d{1,5}\/[A-Za-z]{3,5}\/\d{4}\]|\[\d{4}\/[A-Za-z]{3,5}\/\d{4}\])/g;
   let last = 0;
   let match;
   let keyIdx = 0;
@@ -115,6 +116,23 @@ function inlineMarkdown(text) {
       parts.push(<strong key={keyIdx++} className="font-bold">{token.slice(2, -2)}</strong>);
     } else if (token.startsWith('*')) {
       parts.push(<em key={keyIdx++} className="italic">{token.slice(1, -1)}</em>);
+    } else if (token.startsWith('[') && token.endsWith(']')) {
+      const pid = token.slice(1, -1);
+      if (onPatentClick) {
+        parts.push(
+          <button
+            key={keyIdx++}
+            type="button"
+            onClick={() => onPatentClick(pid)}
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-[#6b46c1]/15 text-[#6b46c1] dark:text-purple-300 hover:bg-[#6b46c1]/30 transition-colors mx-0.5 cursor-pointer underline decoration-[#6b46c1]/50 align-baseline"
+            title={`View patent ${pid}`}
+          >
+            [{pid}]
+          </button>
+        );
+      } else {
+        parts.push(token);
+      }
     }
     last = match.index + token.length;
   }
@@ -126,6 +144,7 @@ function inlineMarkdown(text) {
 
 function MessageBubble({ msg, isDarkTheme, onPatentClick }) {
   const isUser = msg.sender === 'user';
+  const [showDebug, setShowDebug] = useState(false);
 
   const verifiedCitations = (msg.citations || []).filter(c => c.verified !== false);
   const unverifiedCitations = (msg.citations || []).filter(c => c.verified === false);
@@ -153,7 +172,7 @@ function MessageBubble({ msg, isDarkTheme, onPatentClick }) {
           <span className="whitespace-pre-wrap">{msg.text}</span>
         ) : (
           <div className="space-y-1">
-            {renderMarkdown(msg.text)}
+            {renderMarkdown(msg.text, onPatentClick)}
           </div>
         )}
 
@@ -168,6 +187,7 @@ function MessageBubble({ msg, isDarkTheme, onPatentClick }) {
               {verifiedCitations.map((c, i) => (
                 <button
                   key={i}
+                  type="button"
                   onClick={() => onPatentClick(c.patent_id)}
                   title={c.title || c.patent_id}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium bg-[#6b46c1]/10 hover:bg-[#6b46c1]/25 text-[#6b46c1] dark:text-purple-300 border border-[#6b46c1]/30 transition-all cursor-pointer"
@@ -195,6 +215,7 @@ function MessageBubble({ msg, isDarkTheme, onPatentClick }) {
               {unverifiedCitations.map((c, i) => (
                 <button
                   key={i}
+                  type="button"
                   onClick={() => onPatentClick(c.patent_id)}
                   title={c.title || c.patent_id}
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-[#6b46c1]/40 transition-all cursor-pointer"
@@ -207,15 +228,60 @@ function MessageBubble({ msg, isDarkTheme, onPatentClick }) {
           </div>
         )}
 
-        {/* LLM engine badge */}
+        {/* LLM engine badge & Retrieval Transparency */}
         {msg.provider && (
-          <div className="mt-2.5 pt-2 border-t border-purple-300/20 text-[10px] text-purple-400 font-mono opacity-70 flex items-center gap-1">
-            <span>Engine:</span>
-            <span className="font-semibold">{msg.provider}</span>
-            {msg.verification && (
-              <span className="ml-2 opacity-70">
-                | Grounding: {Math.round(msg.verification.grounding_ratio * 100)}%
-              </span>
+          <div className="mt-2.5 pt-2 border-t border-purple-300/20 text-[10px] text-purple-400 font-mono flex flex-col gap-1.5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-1.5 opacity-80 flex-wrap">
+                <span>Engine:</span>
+                <span className="font-semibold">{msg.provider}</span>
+                {msg.verification && (
+                  <span className="opacity-80">
+                    · Grounding: {Math.round(msg.verification.grounding_ratio * 100)}%
+                  </span>
+                )}
+                {msg.trace_id && (
+                  <span className="opacity-70">
+                    · Trace: {msg.trace_id}
+                  </span>
+                )}
+              </div>
+
+              {(msg.debug_info || msg.retrieved_evidence?.length > 0) && (
+                <button
+                  type="button"
+                  onClick={() => setShowDebug(prev => !prev)}
+                  className="text-[10px] px-2 py-0.5 rounded border border-purple-400/30 hover:bg-purple-500/10 cursor-pointer transition-colors"
+                >
+                  {showDebug ? 'Hide Debug' : 'Retrieval Transparency'}
+                </button>
+              )}
+            </div>
+
+            {showDebug && (
+              <div className="mt-1.5 p-2.5 rounded-xl bg-purple-950/20 dark:bg-purple-950/40 border border-purple-400/20 text-[11px] font-mono space-y-1.5 text-slate-600 dark:text-purple-200">
+                <div className="font-bold text-[10px] uppercase tracking-wider text-[#6b46c1] dark:text-purple-300">
+                  Retrieval Pipeline Diagnostics
+                </div>
+                {msg.debug_info?.retrieval_method && (
+                  <div>• Retrieval Method: {msg.debug_info.retrieval_method}</div>
+                )}
+                {msg.debug_info?.latency_ms !== undefined && (
+                  <div>• Latency: {msg.debug_info.latency_ms} ms</div>
+                )}
+                {msg.debug_info?.vector_success !== undefined && (
+                  <div>• Vector Retrieval: {msg.debug_info.vector_success ? '✓ Succeeded' : '✗ Bypassed/Empty'}</div>
+                )}
+                {msg.debug_info?.graph_success !== undefined && (
+                  <div>• Knowledge Graph Traversal: {msg.debug_info.graph_success ? '✓ Connected' : 'None in Query'}</div>
+                )}
+                {msg.debug_info?.rerank_success && (
+                  <div>• RRF Ranking: ✓ Verified</div>
+                )}
+                {msg.verification && (
+                  <div>• Verification: {msg.verification.citations_verified} of {msg.verification.total_citations_claimed} citations verified against retrieved records</div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -302,7 +368,10 @@ export default function AIAssistant({ isDarkTheme }) {
           text: ragRes.answer,
           citations: ragRes.citations || [],
           verification: ragRes.verification,
-          provider: ragRes.llm_provider
+          provider: ragRes.llm_provider,
+          trace_id: ragRes.trace_id,
+          debug_info: ragRes.debug_info,
+          retrieved_evidence: ragRes.retrieved_evidence || []
         };
         setMessages(prev => [...prev, aiMsg]);
         setIsThinking(false);

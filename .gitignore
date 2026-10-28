@@ -1,16 +1,119 @@
-# Environment variables and secrets
-.env
-.env.*
-!.env.example
-*.env
-backend/.env
+# ==============================================================================
+# Root .gitignore - Multi-Tier Patent Search & RAG System
+# ==============================================================================
 
-# Large generated RAG datasets
-cleaned/rag/rag_chunks.jsonl
-cleaned/rag/rag_documents.jsonl
+# ------------------------------------------------------------------------------
+# 1. Virtual Environments & Dependencies
+# ------------------------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+node_modules/
+*/node_modules/
+jspm_packages/
+.pnp/
+.pnp.js
 
-# Python artifacts
+# ------------------------------------------------------------------------------
+# 2. Python Caches & Bytecode
+# ------------------------------------------------------------------------------
 __pycache__/
+*/__pycache__/
 *.py[cod]
 *$py.class
+*.so
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+
+# ------------------------------------------------------------------------------
+# 3. Frontend & Build Outputs
+# ------------------------------------------------------------------------------
+dist/
+*/dist/
+dist-ssr/
+build/
+out/
+.vite/
+.parcel-cache/
+.eslintcache
+*.egg-info/
+.eggs/
+wheels/
+*.egg
+
+# ------------------------------------------------------------------------------
+# 4. Logs & Diagnostic Traces
+# ------------------------------------------------------------------------------
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+backend/rag_requests.log
+
+# ------------------------------------------------------------------------------
+# 5. Environment Variables & Secrets (Preserve .env.example)
+# ------------------------------------------------------------------------------
+.env
+.env.*
+*.env
+*.env.local
+backend/.env
+!.env.example
+!*.env.example
+!backend/.env.example
+!migration/.env.example
+
+# ------------------------------------------------------------------------------
+# 6. Machine Learning Weights, Checkpoints & Local Vector Indexes
+# ------------------------------------------------------------------------------
+*.safetensors
+*.onnx
+*.ckpt
+*.tflite
+
+# Local backend vector search indexes & knowledge graphs
+backend/app/data/*.bin
+backend/app/data/*.pkl
+backend/app/data/*.parquet
+backend/app/data/faiss_id_map*.json
+!backend/app/data/id_map_template.json
+
+# ------------------------------------------------------------------------------
+# 7. Large Generated Datasets & Raw Dumps
+# (Excludes massive uncompressed JSONL / raw temporary dumps)
+# ------------------------------------------------------------------------------
+*.jsonl
+cleaned/rag/rag_chunks.jsonl
+cleaned/rag/rag_documents.jsonl
+*.sqlite3
+*.db
+
+# ------------------------------------------------------------------------------
+# 8. Operating System & Editor Metadata
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+desktop.ini
+ehthumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~

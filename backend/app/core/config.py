@@ -4,6 +4,12 @@ from typing import List, Optional
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Automatically enable offline HuggingFace Hub / Transformers if local weights are present
+_hf_cache = Path.home() / ".cache" / "huggingface" / "hub"
+if _hf_cache.exists() and any(_hf_cache.glob("models--sentence-transformers*")):
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
 _backend_dir = Path(__file__).resolve().parent.parent.parent
 _env_paths = [
     str(_backend_dir / ".env"),
@@ -59,15 +65,15 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION: str = "patent_embeddings"
     QDRANT_TIMEOUT: float = 10.0
 
-    # Embedding and Paths
+    # Embedding and Paths (Pre-configured to verified 2016-2018 InPASS assets)
     EMBEDDING_MODEL_NAME: str = "all-MiniLM-L6-v2"
     EMBEDDING_DIM: int = 384
     DATA_DIR: str = _resolve_data_path("backend/app/data")
-    CLEANED_DATA_PATH: str = _resolve_data_path("backend/app/data/cleaned_patents.parquet")
-    FAISS_INDEX_PATH: str = _resolve_data_path("backend/app/data/faiss_index.bin")
-    FAISS_ID_MAP_PATH: str = _resolve_data_path("backend/app/data/faiss_id_map.json")
-    BM25_INDEX_PATH: str = _resolve_data_path("backend/app/data/bm25_index.pkl")
-    GRAPH_STORE_PATH: str = _resolve_data_path("backend/app/data/knowledge_graph.pkl")
+    CLEANED_DATA_PATH: str = _resolve_data_path("backend/app/data/cleaned_patents_2016_2018.parquet")
+    FAISS_INDEX_PATH: str = _resolve_data_path("backend/app/data/faiss_index_2016_2018.bin")
+    FAISS_ID_MAP_PATH: str = _resolve_data_path("backend/app/data/faiss_id_map_2016_2018.json")
+    BM25_INDEX_PATH: str = _resolve_data_path("backend/app/data/bm25_index_2016_2018.pkl")
+    GRAPH_STORE_PATH: str = _resolve_data_path("backend/app/data/knowledge_graph_2016_2018.pkl")
 
     # Groq LLM Settings
     LLM_PROVIDER: str = "groq"

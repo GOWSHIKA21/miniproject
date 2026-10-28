@@ -10,7 +10,6 @@ import {
   Tag, 
   Zap, 
   Globe, 
-  Network, 
   ArrowRight,
   ExternalLink,
   Hash,
@@ -21,7 +20,9 @@ import {
   ChevronDown,
   ChevronUp,
   Building2,
-  BookOpen
+  BookOpen,
+  Sparkles,
+  Info
 } from 'lucide-react';
 import { api } from '../services/api';
 
@@ -37,6 +38,7 @@ export default function PatentDetails({ isDarkTheme }) {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [showSearchText, setShowSearchText] = useState(false);
+  const [showFullDesc, setShowFullDesc] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -45,6 +47,7 @@ export default function PatentDetails({ isDarkTheme }) {
     setError(null);
     setLoading(true);
     setShowSearchText(false);
+    setShowFullDesc(false);
 
     if (!id) {
       setLoading(false);
@@ -64,7 +67,7 @@ export default function PatentDetails({ isDarkTheme }) {
           try {
             const related = await api.getRelatedPatents(id);
             if (isMounted && related) {
-              setRelatedPatents(related);
+              setRelatedPatents(Array.isArray(related) ? related : (related.related || []));
             }
           } catch (rErr) {
             console.warn('Failed to load related patents:', rErr);
@@ -85,6 +88,14 @@ export default function PatentDetails({ isDarkTheme }) {
     loadData();
     return () => { isMounted = false; };
   }, [id]);
+
+  const handleBack = () => {
+    if (window.history.state && typeof window.history.state.idx === 'number' && window.history.state.idx > 0) {
+      navigate(-1);
+    } else {
+      navigate('/search');
+    }
+  };
 
   const handleShare = () => {
     try {
@@ -127,7 +138,7 @@ export default function PatentDetails({ isDarkTheme }) {
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => navigate(-1)} 
+            onClick={handleBack} 
             className={`px-4 py-2 border rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
               isDarkTheme ? 'bg-[#18112e] border-[#2b1f4c] text-white hover:border-[#6b46c1]' : 'bg-white border-[#e9e1fa] text-[#2d1f56] hover:border-[#6b46c1]'
             }`}
@@ -188,6 +199,13 @@ export default function PatentDetails({ isDarkTheme }) {
   const sourceUrl = patent.source_url || patent.sourceUrl || '';
   const searchText = patent.search_text || patent.searchText || '';
 
+  const abstract = patent.abstract || '';
+  const description = patent.description || '';
+  const claimsList = Array.isArray(patent.claims) ? patent.claims : [];
+  const inventor = patent.inventor || 'Government of India IPO Record';
+  const organization = patent.organization || patent.applicant || `Indian Patent Office (${ipoLocation})`;
+  const status = patent.status || 'Published';
+
   return (
     <div className={`min-h-[calc(100vh-4rem)] p-4 sm:p-6 lg:p-8 space-y-6 ${
       isDarkTheme ? 'bg-[#120c24] text-white' : 'bg-[#f3eefc] text-[#2d1f56]'
@@ -197,7 +215,7 @@ export default function PatentDetails({ isDarkTheme }) {
         {/* Top Action Bar */}
         <div className="flex items-center justify-between">
           <button 
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className={`flex items-center text-xs font-semibold px-3 py-2 rounded-xl border transition-colors cursor-pointer ${
               isDarkTheme ? 'bg-[#18112e] border-[#2b1f4c] text-white hover:border-[#6b46c1]' : 'bg-white border-[#e9e1fa] text-[#2d1f56] hover:border-[#6b46c1]'
             }`}
@@ -292,6 +310,74 @@ export default function PatentDetails({ isDarkTheme }) {
               </div>
             </div>
 
+            {/* SECTION: Technical Abstract & Specification Scope */}
+            <div className={`rounded-3xl p-6 sm:p-8 border shadow-md space-y-4 ${
+              isDarkTheme ? 'bg-[#18112e] border-[#2b1f4c]' : 'bg-white border-[#e9e1fa]'
+            }`}>
+              <div className="flex items-center justify-between pb-3 border-b border-[#e9e1fa]/40 dark:border-[#2b1f4c]">
+                <h2 className="text-base font-bold flex items-center gap-2 text-[#6b46c1]">
+                  <Sparkles className="w-4 h-4" />
+                  Technical Abstract & Specification Scope
+                </h2>
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#6b46c1]/10 text-[#6b46c1] font-semibold border border-[#6b46c1]/20">
+                  Official InPASS Gazette Extract
+                </span>
+              </div>
+
+              {/* Abstract Summary */}
+              {abstract && (
+                <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-[#231845]/40 border border-purple-100 dark:border-[#382969] space-y-1.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#6b46c1] flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5" /> Invention Abstract Summary
+                  </div>
+                  <p className="text-xs sm:text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+                    {abstract}
+                  </p>
+                </div>
+              )}
+
+              {/* Specification Description */}
+              {description && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      Technical Description & Gazette Record Scope
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowFullDesc(!showFullDesc)}
+                      className="text-xs font-semibold text-[#6b46c1] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      {showFullDesc ? 'Show Less' : 'Expand Details'}
+                      {showFullDesc ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+
+                  <div className={`text-xs leading-relaxed p-4 rounded-2xl border transition-all ${
+                    isDarkTheme ? 'bg-[#120c24] border-[#2b1f4c] text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                  } ${!showFullDesc ? 'max-h-48 overflow-hidden relative' : ''}`}>
+                    <div className="whitespace-pre-line space-y-2">
+                      {description}
+                    </div>
+
+                    {!showFullDesc && (
+                      <div className={`absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t pointer-events-none ${
+                        isDarkTheme ? 'from-[#120c24] to-transparent' : 'from-slate-50 to-transparent'
+                      }`} />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Scope Transparency Notice */}
+              <div className="p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 flex items-start gap-2.5 text-[11px] text-amber-800 dark:text-amber-300">
+                <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                <p>
+                  <strong>Gazette Dataset Notice:</strong> This record provides structured bibliographic metadata, classification, and claims counts from the official Indian Patent Office Gazette publication tables. Full continuous specification drawings and line descriptions are preserved with the Indian Patent Office and available via the IP India verification link below.
+                </p>
+              </div>
+            </div>
+
             {/* SECTION A: Patent Overview & Bibliographic Metadata */}
             <div className={`rounded-3xl p-6 sm:p-8 border shadow-md space-y-4 ${
               isDarkTheme ? 'bg-[#18112e] border-[#2b1f4c]' : 'bg-white border-[#e9e1fa]'
@@ -299,7 +385,7 @@ export default function PatentDetails({ isDarkTheme }) {
               <div className="flex items-center justify-between pb-3 border-b border-[#e9e1fa]/40 dark:border-[#2b1f4c]">
                 <h2 className="text-base font-bold flex items-center gap-2 text-[#6b46c1]">
                   <FileText className="w-4 h-4" />
-                  A. Patent Overview & Metadata
+                  A. Bibliographic & Administrative Details
                 </h2>
                 <span className="text-[11px] text-slate-400 font-medium">Dataset Records</span>
               </div>
@@ -345,27 +431,13 @@ export default function PatentDetails({ isDarkTheme }) {
                 </div>
 
                 <div className="p-3 rounded-2xl bg-slate-50/70 dark:bg-[#231845]/50 border border-[#e9e1fa]/50 dark:border-[#382969]/50 space-y-1">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Domain Imputed</div>
-                  <div className="font-semibold text-sm">
-                    {isFieldImputed !== null && isFieldImputed !== undefined 
-                      ? (isFieldImputed ? 'Yes (Derived classification)' : 'No (Original classification)') 
-                      : 'Not available'}
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-slate-50/70 dark:bg-[#231845]/50 border border-[#e9e1fa]/50 dark:border-[#382969]/50 space-y-1">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Jurisdiction & Office</div>
                   <div className="font-semibold text-sm">{jurisdiction} • IPO {ipoLocation} ({ipoCode})</div>
                 </div>
 
                 <div className="p-3 rounded-2xl bg-slate-50/70 dark:bg-[#231845]/50 border border-[#e9e1fa]/50 dark:border-[#382969]/50 space-y-1">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Application Type</div>
-                  <div className="font-semibold text-sm">{appType}</div>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-slate-50/70 dark:bg-[#231845]/50 border border-[#e9e1fa]/50 dark:border-[#382969]/50 space-y-1">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Application Category</div>
-                  <div className="font-semibold text-sm">{appCategory}</div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Application Classification</div>
+                  <div className="font-semibold text-sm">{appType} ({appCategory})</div>
                 </div>
 
               </div>
@@ -378,7 +450,7 @@ export default function PatentDetails({ isDarkTheme }) {
               <div className="flex items-center justify-between pb-3 border-b border-[#e9e1fa]/40 dark:border-[#2b1f4c]">
                 <h2 className="text-base font-bold flex items-center gap-2 text-[#6b46c1]">
                   <Layers className="w-4 h-4" />
-                  B. Patent Specification & Claims
+                  B. Patent Specification & Claims Scope
                 </h2>
                 <span className="text-[11px] text-slate-400 font-medium">Structure & Boundaries</span>
               </div>
@@ -414,7 +486,7 @@ export default function PatentDetails({ isDarkTheme }) {
               {/* Normalized Title Inspection */}
               <div className="p-4 rounded-2xl bg-slate-50/50 dark:bg-[#231845]/30 border border-[#e9e1fa]/40 dark:border-[#382969]/40 space-y-1.5 text-xs">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <BookOpen className="w-3.5 h-3.5 text-[#6b46c1]" /> Normalized Title in Index
+                  <BookOpen className="w-3.5 h-3.5 text-[#6b46c1]" /> Normalized Title in Search Index
                 </div>
                 <div className="font-mono text-xs text-slate-600 dark:text-slate-300 break-words leading-relaxed">
                   {titleNormalized}
@@ -429,9 +501,9 @@ export default function PatentDetails({ isDarkTheme }) {
               <div className="flex items-center justify-between pb-3 border-b border-[#e9e1fa]/40 dark:border-[#2b1f4c]">
                 <h2 className="text-base font-bold flex items-center gap-2 text-[#6b46c1]">
                   <FileCode className="w-4 h-4" />
-                  C. Source & Provenance
+                  C. Source & Official Verification
                 </h2>
-                <span className="text-[11px] text-slate-400 font-medium">Official Verification</span>
+                <span className="text-[11px] text-slate-400 font-medium">Public Records</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -500,60 +572,97 @@ export default function PatentDetails({ isDarkTheme }) {
 
             </div>
 
-            {/* Related Patents from Knowledge Graph via Concept Overlap */}
-            {relatedPatents && relatedPatents.length > 0 && (
-              <div className={`rounded-3xl p-6 sm:p-8 border shadow-md space-y-4 ${
-                isDarkTheme ? 'bg-[#18112e] border-[#2b1f4c]' : 'bg-white border-[#e9e1fa]'
-              }`}>
-                <div className="flex items-center justify-between">
+            {/* SECTION: Related Inventions via Semantic Vector Similarity */}
+            <div className={`rounded-3xl p-6 sm:p-8 border shadow-md space-y-4 ${
+              isDarkTheme ? 'bg-[#18112e] border-[#2b1f4c]' : 'bg-white border-[#e9e1fa]'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div>
                   <h2 className="text-base font-bold flex items-center gap-2">
-                    <Network className="w-4 h-4 text-[#6b46c1]" />
-                    Related Inventions via Concept Overlap ({relatedPatents.length})
+                    <Sparkles className="w-4 h-4 text-[#6b46c1]" />
+                    Related Inventions via Semantic Similarity
                   </h2>
-                  <span className="text-[11px] text-slate-400">Click any card to inspect patent</span>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Computed via 384-dimensional dense embeddings & domain classification
+                  </p>
                 </div>
+                {relatedPatents && relatedPatents.length > 0 && (
+                  <span className="text-xs font-bold text-[#6b46c1] bg-[#6b46c1]/10 px-2.5 py-1 rounded-full border border-[#6b46c1]/20">
+                    {relatedPatents.length} Inventions Found
+                  </span>
+                )}
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {relatedPatents.map((rel, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => handleNavigateToRelated(rel.patent_id)}
-                      className={`group p-4 rounded-2xl border cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between ${
-                        isDarkTheme 
-                          ? 'bg-[#231845] border-[#382969] hover:border-[#6b46c1]' 
-                          : 'bg-[#f4effc] border-[#e2d5f8] hover:border-[#6b46c1]'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <span className="font-mono text-[11px] font-bold text-[#6b46c1] group-hover:underline">
-                            {rel.patent_id}
-                          </span>
-                          {rel.location && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/40 dark:bg-black/20 text-slate-500">
-                              {rel.location}
+              {relatedPatents && relatedPatents.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {relatedPatents.map((rel, idx) => {
+                    const simScore = rel.similarity_pct || Math.round((rel.similarity_score || 0) * 100);
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => handleNavigateToRelated(rel.patent_id)}
+                        className={`group p-4 rounded-2xl border cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between ${
+                          isDarkTheme 
+                            ? 'bg-[#231845] border-[#382969] hover:border-[#6b46c1]' 
+                            : 'bg-[#f4effc] border-[#e2d5f8] hover:border-[#6b46c1]'
+                        }`}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-xs font-bold text-[#6b46c1] group-hover:underline">
+                              {rel.patent_id}
                             </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#6b46c1]/15 text-[#6b46c1] border border-[#6b46c1]/20">
+                              {simScore}% Match
+                            </span>
+                          </div>
+
+                          <h4 className="text-xs font-bold line-clamp-2 group-hover:text-[#6b46c1] transition-colors leading-snug">
+                            {rel.title}
+                          </h4>
+
+                          {rel.match_reason && (
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                              {rel.match_reason}
+                            </p>
+                          )}
+
+                          {rel.shared_concepts && rel.shared_concepts.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {rel.shared_concepts.slice(0, 3).map((concept, cIdx) => (
+                                <span key={cIdx} className="text-[10px] px-2 py-0.5 rounded-md bg-white/60 dark:bg-black/30 text-purple-700 dark:text-purple-300 font-medium">
+                                  #{concept}
+                                </span>
+                              ))}
+                            </div>
                           )}
                         </div>
 
-                        <h4 className="text-xs font-bold line-clamp-2 mb-3 group-hover:text-[#6b46c1] transition-colors">
-                          {rel.title}
-                        </h4>
+                        <div className="pt-3 mt-3 border-t border-purple-200/30 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-400 text-[10px] uppercase font-semibold">
+                            {rel.field || 'Invention'} {rel.location ? `• ${rel.location}` : ''}
+                          </span>
+                          <span className="text-[#6b46c1] font-bold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform text-xs">
+                            View Patent <ArrowRight className="w-3 h-3" />
+                          </span>
+                        </div>
                       </div>
-
-                      <div className="pt-2.5 border-t border-purple-200/30 flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400 text-[10px] uppercase font-semibold">
-                          {rel.field || 'Invention'}
-                        </span>
-                        <span className="text-[#6b46c1] font-bold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                          {rel.shared_concepts_count ? `${rel.shared_concepts_count} shared concepts` : 'View Patent'} <ArrowRight className="w-3 h-3" />
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className={`p-6 rounded-2xl border text-center space-y-2 ${
+                  isDarkTheme ? 'bg-[#120c24] border-[#2b1f4c]' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <p className="text-xs font-semibold text-slate-500">
+                    No sufficiently related inventions found in the current dataset with high confidence (similarity &ge; 40%).
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    This invention may embody distinct technical subject matter or specialized domain claims.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right Sidebar Metadata */}
@@ -577,11 +686,11 @@ export default function PatentDetails({ isDarkTheme }) {
               </button>
 
               <button 
-                onClick={() => navigate(`/graph?patentId=${encodeURIComponent(patentId)}`)}
+                onClick={() => navigate(`/assistant?q=${encodeURIComponent(`What problem does patent ${patentId} solve and what are its key claims?`)}`)}
                 className="w-full flex items-center justify-center gap-2 bg-[#f3eefc] dark:bg-[#231845] text-[#6b46c1] dark:text-purple-200 hover:bg-[#6b46c1] hover:text-white px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer border border-[#e2d5f8] dark:border-[#382969]"
               >
-                <Network className="w-4 h-4" />
-                Explore Knowledge Graph
+                <FileText className="w-4 h-4" />
+                Analyze Problem & Solution
               </button>
             </div>
 
@@ -603,6 +712,12 @@ export default function PatentDetails({ isDarkTheme }) {
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Publication Number</div>
                   <div className="font-mono font-semibold break-all">{pubNumber}</div>
+                </div>
+
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Inventor / Applicant</div>
+                  <div className="font-semibold text-slate-700 dark:text-slate-200">{inventor}</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">{organization}</div>
                 </div>
 
                 <div>

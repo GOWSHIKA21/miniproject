@@ -3,6 +3,10 @@ import re
 import logging
 from typing import Dict, Any, List, Optional
 import pandas as pd
+try:
+    import faiss
+except Exception:
+    pass
 from backend.app.config import settings
 from backend.app.database.mongodb import mongo_client
 from backend.app.schemas.patent import PatentFrontendFormat
@@ -17,7 +21,6 @@ class PatentService:
         if self._df_cache is None:
             data_path = settings.CLEANED_DATA_PATH
             if not os.path.exists(data_path):
-                # Fallback to relative or app dir
                 candidate = os.path.join(os.path.dirname(__file__), "..", "data", "cleaned_patents.parquet")
                 if os.path.exists(candidate):
                     data_path = candidate
@@ -88,23 +91,55 @@ class PatentService:
         if relevance is not None:
             rel_pct = round(float(relevance) * 100, 1)
 
-        # Build concise factual summary for cards without fabricating claims or specifications
-        summary_parts = []
-        if app_type:
-            summary_parts.append(f"{app_type}")
+        # Structured Abstract
+        abstract_parts = [
+            f"Official Indian Patent Application {p_id} titled \"{title}\", classified under technical domain {field or 'General Engineering'}."
+        ]
         if loc:
-            summary_parts.append(f"IPO {loc} ({code or 'India'})")
-        if pages_int is not None and claims_int is not None:
-            summary_parts.append(f"{pages_int} pages, {claims_int} claims")
-        elif claims_int is not None:
-            summary_parts.append(f"{claims_int} claims")
+            abstract_parts.append(f"Filed at IPO {loc} branch office under application category {app_cat or app_type or 'Ordinary'}.")
         if filing_d and pub_d:
-            summary_parts.append(f"Filed {filing_d}, Published {pub_d}")
-        summary_text = " • ".join(summary_parts) if summary_parts else (search_t or "Official Indian Patent Office publication record.")
+            abstract_parts.append(f"Filing date: {filing_d}; Journal publication date: {pub_d}.")
+        if claims_int is not None:
+            pages_text = f" across {pages_int} specification pages" if pages_int else ""
+            abstract_parts.append(f"The filing comprises {claims_int} legal claims{pages_text}.")
+        abstract_text = " ".join(abstract_parts)
+
+        # Structured Description / Specification Scope
+        desc_lines = [
+            f"### 1. Technical Overview & Domain Classification",
+            f"The invention is designated as \"{title}\". It is formally cataloged under the technical domain `{field or 'General Technology'}` within the Indian Patent Office jurisdiction ({jurisdiction}).",
+            "",
+            f"### 2. Filing Chronology & Administrative Metadata",
+            f"- **Application Number:** `{p_id}`",
+            f"- **Publication Journal Number:** `{pub_no or 'Standard Gazette'}`",
+            f"- **Filing Date:** {filing_d or 'Recorded in Gazette'}",
+            f"- **Publication Date:** {pub_d or 'Recorded in Gazette'}",
+            f"- **IPO Branch Office:** {loc or 'India Central'} ({code or 'IPO'})",
+            f"- **Application Classification:** {app_type or 'Standard'} ({app_cat or 'Ordinary'})",
+        ]
+        if pendency_int:
+            desc_lines.append(f"- **Examination Pendency:** {pendency_int} days")
+        desc_lines.extend([
+            "",
+            f"### 3. Specification Scope & Claim Boundary",
+            f"- **Total Specification Length:** {pages_int if pages_int is not None else 'Refer to filing'} pages",
+            f"- **Number of Legal Claims:** {claims_int if claims_int is not None else 'Refer to filing'} claims ({claims_rng or 'Standard claim bin'})",
+            "",
+            f"### 4. Official Gazette Record Scope & Public Notice",
+            f"This record is sourced from the official Indian Patent Office Gazette publication archives (source file: `{source_f or 'IPO Gazette'}`).",
+            "> **Note on Full Specifications:** In accordance with InPASS gazette publishing conventions, this repository maintains structured bibliographic records, classification data, and claims counts. Full continuous legal patent specifications, line drawings, and claims sheets are filed directly with the Controller General of Patents, Designs and Trade Marks (CGPDTM) and are accessible via the official IP India portal."
+        ])
+        description_text = "\n".join(desc_lines)
+
+        claims_list = []
+        if claims_int:
+            claims_list.append(f"Official filing embodies {claims_int} legal claims ({claims_rng or 'categorized'}) filed with the Indian Patent Office.")
+            if field:
+                claims_list.append(f"Claims fall within the classified technical boundary of {field}.")
 
         return PatentFrontendFormat(
             id=p_id,
-            patentNumber=pub_no or p_id,
+            patentNumber=p_id,
             patent_id=p_id,
             patentId=p_id,
             publication_number=pub_no,
@@ -157,7 +192,9 @@ class PatentService:
             search_text=search_t,
             searchText=search_t,
             relevance=rel_pct,
-            abstract=summary_text,
+            abstract=abstract_text,
+            description=description_text,
+            claims=claims_list,
             inventor=record.get("inventor") or "Government of India IPO Record",
             organization=record.get("organization") or (f"Indian Patent Office ({loc} Branch)" if loc else "Indian Patent Office"),
             status=record.get("status") or (f"Published ({app_cat or 'Application'})"),
@@ -206,6 +243,112 @@ class PatentService:
                     result[row["patent_id"]] = row.to_dict()
 
         return result
+
+    def get_related_inventions(
+        self,
+        patent_id: str,
+        limit: int = 6,
+        min_similarity: float = 0.40
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate semantically related invention recommendations using vector embeddings,
+        normalized metadata, and Knowledge Graph domain synergy.
+        Guarantees honest empty states when candidate similarity does not meet threshold,
+        excludes self/duplicates, and provides transparent match explanations.
+        """
+        clean_id = str(patent_id).strip()
+        target = self.get_patent_by_id(clean_id)
+        if not target:
+            return []
+
+        # 1. Fetch target vector from FAISS or encode
+        from backend.app.retrieval.vector_search import faiss_retriever
+        target_text = f"{target.title} {target.field_of_invention or ''} {target.search_text or ''}"
+        target_vec = faiss_retriever.get_patent_vector(clean_id, fallback_text=target_text)
+        if target_vec is None:
+            return []
+
+        # 2. Semantic search for candidates
+        candidates_raw = faiss_retriever.search_by_vector(target_vec, top_k=limit * 5 + 10)
+        if not candidates_raw:
+            return []
+
+        # Filter out self, duplicates, and candidates below min_similarity
+        valid_candidates = []
+        seen_ids = {clean_id}
+        for c in candidates_raw:
+            pid = c["patent_id"]
+            score = float(c["score"])
+            if pid in seen_ids:
+                continue
+            seen_ids.add(pid)
+            if score < min_similarity:
+                continue
+            valid_candidates.append((pid, score))
+
+        if not valid_candidates:
+            return []
+
+        # Batch fetch metadata for candidates
+        cand_ids = [pid for pid, _ in valid_candidates[:limit * 2]]
+        cand_records = self.get_patents_batch(cand_ids)
+
+        # Stop words for concept extraction
+        stopwords = {
+            "a", "an", "the", "of", "for", "with", "in", "on", "by", "to", "and", "or",
+            "as", "at", "is", "from", "device", "apparatus", "method", "system", "improved",
+            "process", "composition", "thereof", "same", "using", "novel", "preparation",
+            "producing", "production", "treatment", "having", "comprising", "useful"
+        }
+
+        target_words = set(re.findall(r"\b[a-zA-Z]{3,}\b", target.title.lower())) - stopwords
+
+        results = []
+        for pid, score in valid_candidates:
+            raw_c = cand_records.get(pid)
+            if not raw_c:
+                continue
+
+            c_title = str(raw_c.get("title", "") or "").strip()
+            c_field = str(raw_c.get("field_of_invention", "") or "").strip()
+            c_loc = str(raw_c.get("ipo_location", "") or "").strip()
+            c_claims = raw_c.get("no_of_claims")
+            c_pages = raw_c.get("no_of_pages")
+
+            cand_words = set(re.findall(r"\b[a-zA-Z]{3,}\b", c_title.lower())) - stopwords
+            shared_concepts = sorted(list(target_words & cand_words))
+
+            is_same_domain = bool(target.field_of_invention and c_field and target.field_of_invention.upper() == c_field.upper())
+            sim_pct = int(round(score * 100))
+
+            # Generate accurate, non-hallucinatory match explanation
+            if shared_concepts and is_same_domain:
+                reason = f"High semantic similarity ({sim_pct}%) in {c_field}; shares core technical concepts: {', '.join(shared_concepts[:4])}."
+            elif shared_concepts:
+                reason = f"Strong semantic alignment ({sim_pct}%); overlapping technical keywords: {', '.join(shared_concepts[:4])}."
+            elif is_same_domain:
+                reason = f"Conceptual similarity ({sim_pct}%) within the classified {c_field} technical domain."
+            else:
+                reason = f"Semantic vector similarity ({sim_pct}%) based on technical problem formulation and terminology."
+
+            results.append({
+                "patent_id": pid,
+                "title": c_title,
+                "field": c_field or "General",
+                "location": c_loc,
+                "similarity_score": round(score, 3),
+                "similarity_pct": sim_pct,
+                "shared_concepts": shared_concepts,
+                "shared_concepts_count": len(shared_concepts),
+                "match_reason": reason,
+                "no_of_claims": int(c_claims) if c_claims is not None and not pd.isna(c_claims) else None,
+                "no_of_pages": int(c_pages) if c_pages is not None and not pd.isna(c_pages) else None
+            })
+
+            if len(results) >= limit:
+                break
+
+        return results
 
     def get_dataset_stats(self) -> Dict[str, Any]:
         """Aggregate stats for the Home and Explorer pages."""
@@ -269,7 +412,6 @@ class PatentService:
                 pyear = str(priority_date).strip()
                 if re.match(r"^\d{4}$", pyear):
                     year_int = int(pyear)
-                    # Check priority_date column if explicitly present in dataset
                     if "priority_date" in df.columns:
                         prio_series = df["priority_date"].astype(str)
                         prio_mask = prio_series.str.startswith(pyear) & (~prio_series.isin(["nan", "None", ""]))
@@ -286,7 +428,6 @@ class PatentService:
                                 year_mask |= (df["filing_year"] == year_int)
                             mask &= year_mask
                     else:
-                        # Dedicated priority-date filter safely applied strictly to patent date/year fields
                         year_mask = (
                             df["publication_date"].astype(str).str.startswith(pyear) |
                             df["filing_date"].astype(str).str.startswith(pyear)
@@ -312,7 +453,7 @@ class PatentService:
                 elif date_to:
                     mask &= (df["publication_date"].astype(str) <= str(date_to)) | (df["filing_date"].astype(str) <= str(date_to))
 
-            # 5. Inventor (Whole-word matching to avoid false positives like 'tata' in 'rotatable')
+            # 5. Inventor (Whole-word matching)
             inv = filters.get("inventor")
             if inv and str(inv).strip():
                 inv_clean = str(inv).strip()
@@ -328,7 +469,7 @@ class PatentService:
                     inv_mask |= df["search_text"].astype(str).str.contains(inv_rx, case=False, regex=True, na=False)
                     mask &= inv_mask
 
-            # 6. Organization (Whole-word matching across IPO location, applicant, title, and search_text)
+            # 6. Organization (Whole-word matching)
             org = filters.get("organization")
             if org and str(org).strip():
                 org_clean = str(org).strip()

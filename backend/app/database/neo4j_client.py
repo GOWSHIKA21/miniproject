@@ -104,7 +104,7 @@ class Neo4jClient:
                 self.driver = None
 
         # Attempt 2: Fallback to HTTPS Query API on Port 443 (firewall resilient)
-        if self._test_http_api():
+        if self.host not in ("localhost", "127.0.0.1") and self._test_http_api():
             self.connected = True
             self.use_http = True
             logger.info(f"Connected to Neo4j Aura via HTTPS Query API (Port 443) at {masked} (database: '{self.database}')")

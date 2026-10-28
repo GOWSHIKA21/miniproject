@@ -28,11 +28,12 @@ class PatentBase(BaseModel):
     no_of_pages_imputed: Optional[int] = Field(None, description="Imputed pages count")
     no_of_claims_imputed: Optional[int] = Field(None, description="Imputed claims count")
     abstract: Optional[str] = Field(None, description="Patent abstract or concise metadata summary")
+    description: Optional[str] = Field(None, description="Structured technical scope and description")
 
 class PatentFrontendFormat(BaseModel):
     """
     Comprehensive schema matching frontend expectations in PatentCard and PatentDetails,
-    providing all 25 dataset fields in both camelCase and snake_case for complete compatibility.
+    providing all dataset fields in both camelCase and snake_case for complete compatibility.
     """
     id: str
     patentNumber: str
@@ -97,6 +98,8 @@ class PatentFrontendFormat(BaseModel):
     
     relevance: Optional[float] = None
     abstract: Optional[str] = None
+    description: Optional[str] = None
+    claims: Optional[List[str]] = None
     inventor: Optional[str] = None
     organization: Optional[str] = None
     status: Optional[str] = None

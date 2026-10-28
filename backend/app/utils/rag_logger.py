@@ -76,6 +76,9 @@ class RAGRequestContext:
         self.retrieval_scores: List[float] = []
         self.num_retrieved: int = 0
         self.evidence_sufficient: bool = False
+        self.vector_success: bool = False
+        self.graph_success: bool = False
+        self.rerank_success: bool = False
         self.llm_provider: str = "unknown"
         self.latency_ms: int = 0
         self.error: Optional[str] = None
@@ -106,6 +109,9 @@ class RAGRequestContext:
             "timestamp_utc": self.timestamp_utc,
             "query": self.query[:300],  # truncate for log safety
             "retrieval_method": self.retrieval_method,
+            "vector_success": self.vector_success,
+            "graph_success": self.graph_success,
+            "rerank_success": self.rerank_success,
             "num_retrieved": self.num_retrieved,
             "evidence_sufficient": self.evidence_sufficient,
             "retrieved_patent_ids": self.retrieved_patent_ids[:20],  # cap list size

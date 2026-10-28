@@ -29,3 +29,5 @@ class ChatResponse(BaseModel):
     retrieved_evidence: List[SearchResultItem]
     verification: VerificationReport
     llm_provider: str
+    trace_id: Optional[str] = None
+    debug_info: Optional[dict] = None

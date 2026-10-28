@@ -8,7 +8,10 @@ import {
   saveSearchState,
   loadSearchState,
   clearSearchState,
-  buildStateKey
+  saveScrollPosition,
+  buildStateKey,
+  buildSearchParamsFromState,
+  parseStateFromSearchParams
 } from '../hooks/useSearchState';
 import { Search as SearchIcon, SlidersHorizontal, Sparkles, RotateCcw } from 'lucide-react';
 
@@ -47,88 +50,117 @@ const DEFAULT_FILTERS = {
 export default function Search({ isDarkTheme }) {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Read URL params (used for direct links / Technology Explorer navigation)
-  const urlQuery       = searchParams.get('q') || '';
-  const urlTech        = searchParams.get('tech') || '';
-  const urlOffice      = searchParams.get('office') || '';
-  const urlPriorityYear = searchParams.get('priorityDate') || '';
-  const urlPage        = parseInt(searchParams.get('page') || '1', 10);
-  const urlPageSize    = parseInt(searchParams.get('pageSize') || '25', 10);
-  const urlSortBy      = searchParams.get('sort') || 'relevance';
-
-  const hasUrlParams = Boolean(
-    urlQuery.trim() || urlTech || urlOffice || urlPriorityYear ||
-    searchParams.get('exactDate') || searchParams.get('dateFrom') ||
-    searchParams.get('dateTo') || searchParams.get('inventor') ||
-    searchParams.get('org')
-  );
-
-  // ── Decide initial state: prefer URL params → then session cache → then blank ─
+  // Parse state from current URL
+  const parsedUrl = parseStateFromSearchParams(searchParams, DEFAULT_FILTERS);
   const cachedState = loadSearchState();
 
-  // Build filters from URL params (only when URL has something)
-  const filtersFromUrl = hasUrlParams ? {
-    ...DEFAULT_FILTERS,
-    dateType: urlPriorityYear ? 'Priority' : '',
-    priorityDate: urlPriorityYear,
-    selectedTechnologies: urlTech ? [urlTech] : [],
-    patentOffice: urlOffice || ''
-  } : null;
+  // Determine whether URL params match cached state
+  const urlKey = parsedUrl.hasParams
+    ? buildStateKey({
+        query: parsedUrl.query,
+        filters: parsedUrl.filters,
+        page: parsedUrl.page,
+        pageSize: parsedUrl.pageSize,
+        sortBy: parsedUrl.sortBy
+      })
+    : null;
 
-  // If URL params match cached state key exactly, we can restore from cache without re-fetching
   const cachedKey = cachedState ? cachedState.stateKey : null;
-  const urlStateKey = hasUrlParams ? buildStateKey({
-    query: urlQuery,
-    filters: filtersFromUrl,
-    page: urlPage,
-    pageSize: urlPageSize,
-    sortBy: urlSortBy
-  }) : null;
+  const canRestoreEmptyUrl = !parsedUrl.hasParams && cachedState && Array.isArray(cachedState.results) && cachedState.results.length > 0;
+  const urlMatchesCache = Boolean(parsedUrl.hasParams && urlKey && cachedKey && urlKey === cachedKey && cachedState.results?.length > 0);
 
-  const canRestoreCache = !hasUrlParams && cachedState && Array.isArray(cachedState.results) && cachedState.results.length > 0;
-  const urlMatchesCache = hasUrlParams && urlStateKey && cachedKey && urlStateKey === cachedKey;
+  const shouldRestoreFromCache = canRestoreEmptyUrl || urlMatchesCache;
 
-  // Derive initial component state
-  const initialQuery   = canRestoreCache ? cachedState.query   : (hasUrlParams ? urlQuery  : '');
-  const initialFilters = canRestoreCache ? cachedState.filters : (filtersFromUrl || DEFAULT_FILTERS);
-  const initialPage    = canRestoreCache ? cachedState.page    : Math.max(1, urlPage);
-  const initialPageSize= canRestoreCache ? cachedState.pageSize: urlPageSize;
-  const initialSortBy  = canRestoreCache ? cachedState.sortBy  : urlSortBy;
-  const initialResults = (canRestoreCache || urlMatchesCache) ? (cachedState.results || []) : [];
-  const initialTotal   = (canRestoreCache || urlMatchesCache) ? (cachedState.totalMatching || 0) : 0;
-  const initialTotalPages = (canRestoreCache || urlMatchesCache) ? (cachedState.totalPages || 1) : 1;
-  const initialHasSearched = canRestoreCache || urlMatchesCache ? true : hasUrlParams;
+  // Initialize state: prefer cached state if restoring, else URL state, else defaults
+  const initialQuery    = shouldRestoreFromCache ? cachedState.query    : parsedUrl.query;
+  const initialFilters  = shouldRestoreFromCache ? cachedState.filters  : parsedUrl.filters;
+  const initialPage     = shouldRestoreFromCache ? cachedState.page     : parsedUrl.page;
+  const initialPageSize = shouldRestoreFromCache ? cachedState.pageSize : parsedUrl.pageSize;
+  const initialSortBy   = shouldRestoreFromCache ? cachedState.sortBy   : parsedUrl.sortBy;
+  const initialResults  = shouldRestoreFromCache ? (cachedState.results || []) : [];
+  const initialTotal    = shouldRestoreFromCache ? (cachedState.totalMatching || 0) : 0;
+  const initialTotalPages = shouldRestoreFromCache ? (cachedState.totalPages || 1) : 1;
+  const initialHasSearched = shouldRestoreFromCache ? true : parsedUrl.hasParams;
 
-  const [query, setQuery]             = useState(initialQuery);
-  const [filters, setFilters]         = useState(initialFilters);
-  const [page, setPage]               = useState(initialPage);
-  const [pageSize, setPageSize]       = useState(initialPageSize);
-  const [sortBy, setSortBy]           = useState(initialSortBy);
-  const [results, setResults]         = useState(initialResults);
+  const [query, setQuery]                 = useState(initialQuery);
+  const [filters, setFilters]             = useState(initialFilters);
+  const [page, setPage]                   = useState(initialPage);
+  const [pageSize, setPageSize]           = useState(initialPageSize);
+  const [sortBy, setSortBy]               = useState(initialSortBy);
+  const [results, setResults]             = useState(initialResults);
   const [totalMatching, setTotalMatching] = useState(initialTotal);
-  const [totalPages, setTotalPages]   = useState(initialTotalPages);
-  const [hasSearched, setHasSearched] = useState(initialHasSearched);
-  const [isSearching, setIsSearching] = useState(hasUrlParams && !canRestoreCache && !urlMatchesCache);
-  const [backendError, setBackendError] = useState(false);
+  const [totalPages, setTotalPages]       = useState(initialTotalPages);
+  const [hasSearched, setHasSearched]     = useState(initialHasSearched);
+  const [isSearching, setIsSearching]     = useState(parsedUrl.hasParams && !shouldRestoreFromCache);
+  const [backendError, setBackendError]   = useState(false);
 
-  // Track whether the initial render is using cached results (to skip auto-fetch)
-  const isRestoredFromCache = useRef(canRestoreCache || urlMatchesCache);
-
-  const resultsTopRef = useRef(null);
+  // Flags to prevent unwanted re-fetching on cache restoration
+  const isRestoredFromCache = useRef(shouldRestoreFromCache);
   const scrollRestoredRef = useRef(false);
+  const resultsTopRef = useRef(null);
+
+  // Sync URL search params when restoring from cache with empty URL
+  useEffect(() => {
+    if (canRestoreEmptyUrl && cachedState) {
+      const syncdParams = buildSearchParamsFromState({
+        query: cachedState.query,
+        filters: cachedState.filters,
+        page: cachedState.page,
+        pageSize: cachedState.pageSize,
+        sortBy: cachedState.sortBy
+      });
+      setSearchParams(syncdParams, { replace: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Track and persist scroll position on scroll and on unmount ──────────
+  useEffect(() => {
+    let scrollTimer = null;
+    const handleScroll = () => {
+      if (scrollTimer) clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        saveScrollPosition(window.scrollY);
+      }, 150);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      if (scrollTimer) clearTimeout(scrollTimer);
+      window.removeEventListener('scroll', handleScroll);
+      saveScrollPosition(window.scrollY);
+    };
+  }, []);
 
   // ── Restore scroll position after cached results render ───────────────────
   useLayoutEffect(() => {
-    if (isRestoredFromCache.current && !scrollRestoredRef.current && cachedState?.scrollY != null) {
+    if (isRestoredFromCache.current && !scrollRestoredRef.current && cachedState?.scrollY > 0) {
+      const targetScroll = cachedState.scrollY;
       scrollRestoredRef.current = true;
-      // Defer to after paint so the result list has fully rendered
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: cachedState.scrollY, behavior: 'instant' });
-      });
-    }
-  }, [results]);
 
-  // ── Persist state to session storage whenever key search data changes ─────
+      // Ensure DOM has laid out results before scrolling
+      const restoreScroll = () => {
+        const maxScroll = Math.max(
+          document.body.scrollHeight,
+          document.documentElement.scrollHeight
+        ) - window.innerHeight;
+
+        if (maxScroll >= targetScroll || document.readyState === 'complete') {
+          window.scrollTo({ top: targetScroll, behavior: 'instant' });
+        } else {
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: targetScroll, behavior: 'instant' });
+          });
+        }
+      };
+
+      requestAnimationFrame(restoreScroll);
+      const timer = setTimeout(restoreScroll, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [results, cachedState]);
+
+  // ── Persist state to session storage whenever search results change ──────
   useEffect(() => {
     if (!hasSearched || results.length === 0) return;
     const key = buildStateKey({ query, filters, page, pageSize, sortBy });
@@ -146,44 +178,23 @@ export default function Search({ isDarkTheme }) {
     });
   }, [results, query, filters, page, pageSize, sortBy, totalMatching, totalPages, hasSearched]);
 
-  // ── Sync URL when Technology Explorer sets URL params externally ──────────
-  useEffect(() => {
-    const uTech     = searchParams.get('tech');
-    const uOffice   = searchParams.get('office');
-    const uPage     = parseInt(searchParams.get('page') || '1', 10);
-    const uQ        = searchParams.get('q') || '';
-    const uPriority = searchParams.get('priorityDate') || '';
-
-    const hasParams = Boolean(uTech || uOffice || uQ || uPriority);
-    if (!hasParams) return;
-
-    // External navigation changed URL — flush cache and re-fetch
-    isRestoredFromCache.current = false;
-    setHasSearched(true);
-
-    setFilters(prev => ({
-      ...prev,
-      selectedTechnologies: uTech ? [uTech] : prev.selectedTechnologies,
-      patentOffice: uOffice !== null ? uOffice : prev.patentOffice,
-      priorityDate: uPriority || prev.priorityDate,
-      dateType: uPriority ? 'Priority' : prev.dateType
-    }));
-
-    if (uQ !== query) setQuery(uQ);
-    if (uPage !== page && uPage > 0) setPage(uPage);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
   // ── Core fetch function ───────────────────────────────────────────────────
-  const executeFetch = useCallback(async () => {
+  const executeFetch = useCallback(async (fetchQuery, fetchFilters, fetchPage, fetchPageSize, fetchSort) => {
+    const q = fetchQuery !== undefined ? fetchQuery : query;
+    const f = fetchFilters !== undefined ? fetchFilters : filters;
+    const p = fetchPage !== undefined ? fetchPage : page;
+    const ps = fetchPageSize !== undefined ? fetchPageSize : pageSize;
+    const s = fetchSort !== undefined ? fetchSort : sortBy;
+
     setIsSearching(true);
     setBackendError(false);
     try {
-      const response = await api.search(query, filters, page, pageSize, sortBy, 'hybrid');
+      const response = await api.search(q, f, p, ps, s, 'hybrid');
       if (response !== null && response.results !== undefined) {
         setResults(response.results);
-        setTotalMatching(response.totalMatching ?? response.total ?? response.results.length);
-        setTotalPages(Math.max(1, response.totalPages ?? Math.ceil((response.total ?? 0) / pageSize)));
+        const total = response.totalMatching ?? response.total_matching ?? response.total ?? response.results.length;
+        setTotalMatching(total);
+        setTotalPages(Math.max(1, response.totalPages ?? response.total_pages ?? Math.ceil(total / ps)));
       } else {
         setBackendError(true);
         setResults([]);
@@ -201,8 +212,62 @@ export default function Search({ isDarkTheme }) {
     }
   }, [query, filters, page, pageSize, sortBy]);
 
-  // ── Auto-trigger search (debounced) when criteria change ─────────────────
+  // ── Handle browser Back/Forward (popstate / URL changes) ─────────────────
+  const prevSearchStrRef = useRef(searchParams.toString());
   useEffect(() => {
+    const currentStr = searchParams.toString();
+    if (currentStr === prevSearchStrRef.current) return;
+    prevSearchStrRef.current = currentStr;
+
+    const fromUrl = parseStateFromSearchParams(searchParams, DEFAULT_FILTERS);
+    if (!fromUrl.hasParams) {
+      // Empty URL params: if we have cache, keep it; else reset
+      return;
+    }
+
+    const newKey = buildStateKey({
+      query: fromUrl.query,
+      filters: fromUrl.filters,
+      page: fromUrl.page,
+      pageSize: fromUrl.pageSize,
+      sortBy: fromUrl.sortBy
+    });
+
+    const activeCached = loadSearchState();
+    if (activeCached && activeCached.stateKey === newKey && activeCached.results?.length > 0) {
+      // Safe cache hit: restore without network call
+      setQuery(activeCached.query);
+      setFilters(activeCached.filters);
+      setPage(activeCached.page);
+      setPageSize(activeCached.pageSize);
+      setSortBy(activeCached.sortBy);
+      setResults(activeCached.results);
+      setTotalMatching(activeCached.totalMatching);
+      setTotalPages(activeCached.totalPages);
+      setHasSearched(true);
+      setIsSearching(false);
+      return;
+    }
+
+    // New criteria from URL: fetch freshly
+    isRestoredFromCache.current = false;
+    setQuery(fromUrl.query);
+    setFilters(fromUrl.filters);
+    setPage(fromUrl.page);
+    setPageSize(fromUrl.pageSize);
+    setSortBy(fromUrl.sortBy);
+    setHasSearched(true);
+    executeFetch(fromUrl.query, fromUrl.filters, fromUrl.page, fromUrl.pageSize, fromUrl.sortBy);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // ── Auto-trigger initial search for fresh URL navigation if not cached ───
+  useEffect(() => {
+    if (isRestoredFromCache.current) {
+      isRestoredFromCache.current = false;
+      return;
+    }
+
     const hasCriteria = Boolean(
       query.trim() ||
       filters.selectedTechnologies.length > 0 ||
@@ -212,25 +277,16 @@ export default function Search({ isDarkTheme }) {
       filters.inventor.trim() || filters.organization.trim()
     );
 
-    // If we just restored from cache, skip the fetch for this render cycle only
-    if (isRestoredFromCache.current) {
-      isRestoredFromCache.current = false;
-      return;
-    }
-
     if (!hasSearched && !hasCriteria) {
       setIsSearching(false);
       return;
     }
 
-    const timer = setTimeout(() => {
-      setHasSearched(true);
+    if (results.length === 0 && (hasSearched || hasCriteria)) {
       executeFetch();
-    }, 250);
-
-    return () => clearTimeout(timer);
-  // executeFetch is stable (useCallback) — include it.
-  }, [executeFetch, hasSearched, query, filters]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -239,25 +295,33 @@ export default function Search({ isDarkTheme }) {
     setQuery(searchQuery);
     setPage(1);
     setHasSearched(true);
-    setSearchParams(prev => {
-      const p = new URLSearchParams(prev);
-      if (searchQuery) p.set('q', searchQuery);
-      else p.delete('q');
-      p.set('page', '1');
-      p.set('sort', sortBy);
-      return p;
+
+    const newParams = buildSearchParamsFromState({
+      query: searchQuery,
+      filters,
+      page: 1,
+      pageSize,
+      sortBy
     });
+    setSearchParams(newParams);
+    executeFetch(searchQuery, filters, 1, pageSize, sortBy);
   };
 
   const handlePageChange = (newPage) => {
     if (newPage < 1 || newPage > totalPages || newPage === page) return;
     isRestoredFromCache.current = false;
     setPage(newPage);
-    setSearchParams(prev => {
-      const p = new URLSearchParams(prev);
-      p.set('page', String(newPage));
-      return p;
+
+    const newParams = buildSearchParamsFromState({
+      query,
+      filters,
+      page: newPage,
+      pageSize,
+      sortBy
     });
+    setSearchParams(newParams);
+    executeFetch(query, filters, newPage, pageSize, sortBy);
+
     if (resultsTopRef.current) {
       resultsTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -267,24 +331,32 @@ export default function Search({ isDarkTheme }) {
     isRestoredFromCache.current = false;
     setPageSize(newSize);
     setPage(1);
-    setSearchParams(prev => {
-      const p = new URLSearchParams(prev);
-      p.set('pageSize', String(newSize));
-      p.set('page', '1');
-      return p;
+
+    const newParams = buildSearchParamsFromState({
+      query,
+      filters,
+      page: 1,
+      pageSize: newSize,
+      sortBy
     });
+    setSearchParams(newParams);
+    executeFetch(query, filters, 1, newSize, sortBy);
   };
 
   const handleSortChange = (newSort) => {
     isRestoredFromCache.current = false;
     setSortBy(newSort);
     setPage(1);
-    setSearchParams(prev => {
-      const p = new URLSearchParams(prev);
-      p.set('sort', newSort);
-      p.set('page', '1');
-      return p;
+
+    const newParams = buildSearchParamsFromState({
+      query,
+      filters,
+      page: 1,
+      pageSize,
+      sortBy: newSort
     });
+    setSearchParams(newParams);
+    executeFetch(query, filters, 1, pageSize, newSort);
   };
 
   const handleResetFilters = () => {
@@ -301,24 +373,23 @@ export default function Search({ isDarkTheme }) {
     setHasSearched(false);
     setIsSearching(false);
     setBackendError(false);
-    setSearchParams({});
+    setSearchParams({}, { replace: true });
   };
 
   const handleApplyFilters = () => {
     isRestoredFromCache.current = false;
     setPage(1);
     setHasSearched(true);
-    setSearchParams(prev => {
-      const p = new URLSearchParams();
-      if (query.trim()) p.set('q', query.trim());
-      if (filters.selectedTechnologies.length > 0) p.set('tech', filters.selectedTechnologies[0]);
-      if (filters.patentOffice && filters.patentOffice !== 'All') p.set('office', filters.patentOffice);
-      if (filters.priorityDate) p.set('priorityDate', filters.priorityDate);
-      p.set('page', '1');
-      p.set('sort', sortBy);
-      return p;
+
+    const newParams = buildSearchParamsFromState({
+      query,
+      filters,
+      page: 1,
+      pageSize,
+      sortBy
     });
-    executeFetch();
+    setSearchParams(newParams);
+    executeFetch(query, filters, 1, pageSize, sortBy);
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -372,7 +443,19 @@ export default function Search({ isDarkTheme }) {
               setFilters={(updater) => {
                 setPage(1);
                 isRestoredFromCache.current = false;
-                setFilters(updater);
+                setFilters(prev => {
+                  const updated = typeof updater === 'function' ? updater(prev) : updater;
+                  // Immediately synchronize updated filters to URL
+                  const newParams = buildSearchParamsFromState({
+                    query,
+                    filters: updated,
+                    page: 1,
+                    pageSize,
+                    sortBy
+                  });
+                  setSearchParams(newParams, { replace: true });
+                  return updated;
+                });
               }}
               onReset={handleResetFilters}
               onApply={handleApplyFilters}
@@ -407,8 +490,19 @@ export default function Search({ isDarkTheme }) {
                         key={tech}
                         onClick={() => {
                           isRestoredFromCache.current = false;
-                          setFilters(prev => ({ ...prev, selectedTechnologies: [tech] }));
+                          const newFilters = { ...filters, selectedTechnologies: [tech] };
+                          setFilters(newFilters);
+                          setPage(1);
                           setHasSearched(true);
+                          const newParams = buildSearchParamsFromState({
+                            query,
+                            filters: newFilters,
+                            page: 1,
+                            pageSize,
+                            sortBy
+                          });
+                          setSearchParams(newParams);
+                          executeFetch(query, newFilters, 1, pageSize, sortBy);
                         }}
                         className={`text-xs font-semibold px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
                           isDarkTheme
@@ -448,7 +542,7 @@ export default function Search({ isDarkTheme }) {
                           — Showing page {page} of {totalPages} ({results.length} on this page)
                         </span>
                         {/* Session restore badge */}
-                        {(canRestoreCache || urlMatchesCache) && !isSearching && (
+                        {shouldRestoreFromCache && !isSearching && (
                           <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-semibold">
                             ✓ Session restored
                           </span>
@@ -506,7 +600,7 @@ export default function Search({ isDarkTheme }) {
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 gap-4">
                       {results.map(patent => (
-                        <PatentCard key={patent.id} patent={patent} isDarkTheme={isDarkTheme} />
+                        <PatentCard key={patent.id || patent.patentNumber || patent.patent_id} patent={patent} isDarkTheme={isDarkTheme} />
                       ))}
                     </div>
 

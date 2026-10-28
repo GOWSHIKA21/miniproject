@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Search, BrainCircuit, Network, Info, Zap } from 'lucide-react';
+import { Search, BrainCircuit, Info, Zap, Cpu } from 'lucide-react';
 
 export default function Navbar() {
   const location = useLocation();
@@ -7,9 +7,8 @@ export default function Navbar() {
   const navLinks = [
     { name: 'Home', path: '/', icon: <BrainCircuit className="w-4 h-4 mr-1" /> },
     { name: 'Patent Search', path: '/search', icon: <Search className="w-4 h-4 mr-1" /> },
+    { name: 'Technology Explorer', path: '/explorer', icon: <Cpu className="w-4 h-4 mr-1" /> },
     { name: 'AI Assistant', path: '/assistant', icon: <Zap className="w-4 h-4 mr-1" /> },
-    { name: 'Knowledge Graph', path: '/graph', icon: <Network className="w-4 h-4 mr-1" /> },
-    { name: 'About', path: '/about', icon: <Info className="w-4 h-4 mr-1" /> },
   ];
 
   return (
@@ -24,7 +23,7 @@ export default function Navbar() {
               </div>
               <div>
                 <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-blue-600">
-                  PatentIQ
+                  PatentGraph
                 </span>
               </div>
             </Link>
@@ -58,17 +57,8 @@ export default function Navbar() {
               to="/search"
               className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-full shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all hover:shadow-md"
             >
-              Get Started
+              Start Searching
             </Link>
-          </div>
-          
-          {/* Mobile menu button (stub for now) */}
-          <div className="flex md:hidden items-center">
-            <button className="text-slate-500 hover:text-slate-700 p-2">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
           </div>
         </div>
       </div>
