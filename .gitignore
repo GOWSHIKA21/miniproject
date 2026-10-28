@@ -85,10 +85,13 @@ backend/.env
 *.tflite
 
 # Local backend vector search indexes & knowledge graphs
-backend/app/data/*.bin
-backend/app/data/*.pkl
-backend/app/data/*.parquet
-backend/app/data/faiss_id_map*.json
+# NOTE: These files ARE tracked in git so Render/cloud deployments have them at build time.
+# Total size ~31 MB — acceptable for a production deploy.
+# If size becomes a problem, host them on S3/GCS and download in the build script.
+# backend/app/data/*.bin
+# backend/app/data/*.pkl
+# backend/app/data/*.parquet
+# backend/app/data/faiss_id_map*.json
 !backend/app/data/id_map_template.json
 
 # ------------------------------------------------------------------------------

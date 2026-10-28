@@ -8,4 +8,6 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  // Allow VITE_API_URL to be injected at build time by Vercel
+  // Set VITE_API_URL=https://your-render-app.onrender.com/api in Vercel env vars
 })
